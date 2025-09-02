@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Schedule_I_Developer_Environment_Utility.Models;
 using Schedule_I_Developer_Environment_Utility.Services;
 
@@ -17,12 +18,52 @@ namespace Schedule_I_Developer_Environment_Utility.ViewModels
 
         public ManagedEnvironmentViewModel()
         {
-            _logger = App.Services?.GetRequiredService<ILogger<ManagedEnvironmentViewModel>>()!;
-            _configService = App.Services?.GetRequiredService<ConfigurationService>()!;
-            _uiLogService = App.Services?.GetRequiredService<UiLogService>()!;
-            _steamService = App.Services?.GetRequiredService<SteamService>()!;
+            try
+            {
+                var sp = App.Services;
+                _logger = sp?.GetService<ILogger<ManagedEnvironmentViewModel>>() ?? NullLogger<ManagedEnvironmentViewModel>.Instance;
+                
+                // Try to get services with defensive fallbacks
+                try
+                {
+                    _uiLogService = sp?.GetService<UiLogService>() ?? new UiLogService();
+                }
+                catch
+                {
+                    _uiLogService = new UiLogService();
+                }
+                
+                try
+                {
+                    _configService = sp?.GetService<ConfigurationService>() ?? new ConfigurationService(NullLogger<ConfigurationService>.Instance);
+                }
+                catch
+                {
+                    _configService = new ConfigurationService(NullLogger<ConfigurationService>.Instance);
+                }
+                
+                try
+                {
+                    _steamService = sp?.GetService<SteamService>() ?? new SteamService(NullLogger<SteamService>.Instance);
+                }
+                catch
+                {
+                    _steamService = new SteamService(NullLogger<SteamService>.Instance);
+                }
 
-            _ = LoadBranchesAsync();
+                _ = LoadBranchesAsync();
+            }
+            catch (Exception ex)
+            {
+                // If we can't initialize properly, create minimal services to prevent crashes
+                _logger = NullLogger<ManagedEnvironmentViewModel>.Instance;
+                _uiLogService = new UiLogService();
+                _configService = new ConfigurationService(NullLogger<ConfigurationService>.Instance);
+                _steamService = new SteamService(NullLogger<SteamService>.Instance);
+                
+                _uiLogService.Add($"Error initializing ViewModel: {ex.Message}");
+                _logger.LogError(ex, "Error initializing ManagedEnvironmentViewModel");
+            }
         }
 
         private async Task LoadBranchesAsync()

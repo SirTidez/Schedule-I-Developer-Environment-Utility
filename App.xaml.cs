@@ -31,6 +31,8 @@ namespace Schedule_I_Developer_Environment_Utility
         {
             InitializeComponent();
             ConfigureServices();
+            // Catch otherwise-fatal exceptions (esp. trimmed Release) and log them
+            this.UnhandledException += App_UnhandledException;
         }
 
         /// <summary>
@@ -70,6 +72,7 @@ namespace Schedule_I_Developer_Environment_Utility
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
             try { AppNotificationManager.Default.Register(); } catch { }
+            
             // Launch flow: if config exists -> Managed Environment; else -> Setup Wizard
             var configService = Services?.GetService<Services.ConfigurationService>();
             if (configService != null && !configService.ConfigurationExists())
@@ -94,8 +97,42 @@ namespace Schedule_I_Developer_Environment_Utility
                     try { uiLog?.AttachDispatcher(Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()); } catch { }
                     managedWindow.Activate();
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    try
+                    {
+                        var logger = Services?.GetService<ILogger<App>>();
+                        logger?.LogError(ex, "Failed to open ManagedEnvironmentWindow. Falling back to Setup Wizard.");
+                        var uiLog = Services?.GetService<Services.UiLogService>();
+                        uiLog?.Add($"Error opening manager: {ex.Message}");
+                    }
+                    catch { }
+                    var wizard = new SetupWizardWindow();
+                    _window = wizard;
+                    Schedule_I_Developer_Environment_Utility.Services.ThemeService.ApplyDark(wizard);
+                    wizard.Activate();
+                }
             }
+        }
+
+        private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+        {
+            try
+            {
+                var logger = Services?.GetService<ILogger<App>>();
+                logger?.LogCritical(e.Exception, "Unhandled UI exception");
+                var uiLog = Services?.GetService<Services.UiLogService>();
+                uiLog?.Add($"Unhandled: {e.Exception.Message}");
+            }
+            catch { }
+            // Let’s not crash silently; attempt to show the wizard as a soft landing
+            try
+            {
+                e.Handled = true;
+                var wizard = new SetupWizardWindow();
+                wizard.Activate();
+            }
+            catch { }
         }
         
         private async Task RunConsoleTestAsync()

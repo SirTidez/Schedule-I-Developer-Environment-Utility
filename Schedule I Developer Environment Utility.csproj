@@ -7,6 +7,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>x86;x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+    <!-- Set default runtime for Release builds -->
+    <RuntimeIdentifier Condition="'$(Configuration)' == 'Release' and '$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
     <PublishProfile>win-$(Platform).pubxml</PublishProfile>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
@@ -26,6 +28,7 @@
 
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
+    <TrimmerRootDescriptor Include="Roots.xml" />
   </ItemGroup>
 
   <!-- Exclude legacy Windows Forms reference sources from this WinUI project build -->
@@ -65,9 +68,17 @@
 
   <!-- Publish Properties -->
   <PropertyGroup>
-    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
-    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
-    <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
-    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+    <!-- Disable ReadyToRun for simpler release builds -->
+    <PublishReadyToRun>False</PublishReadyToRun>
+    <!-- Disable trimming for WinUI3 applications to prevent XAML and reflection issues -->
+    <PublishTrimmed>False</PublishTrimmed>
+    <!-- Disable single file publishing for WinUI3 compatibility -->
+    <PublishSingleFile>False</PublishSingleFile>
+    <!-- Self-contained deployment to embed all dependencies -->
+    <SelfContained>true</SelfContained>
+    <!-- Include all native libraries and runtime -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Copy all dependencies to output folder -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 </Project>

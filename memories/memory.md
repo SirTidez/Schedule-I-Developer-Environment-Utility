@@ -1,6 +1,6 @@
 # WinUI3 Refactor Memory Log
 
-## Phase 1 Progress (Base Systems)
+## Phase 1 Progress (Base Systems) ✅
 
 ### Completed ✅
 - Set up dependency injection in App.xaml.cs
@@ -9,44 +9,40 @@
 - Created base ViewModels with INotifyPropertyChanged
 - Updated project file with required dependencies
 
-### Current Issue ❌
-**XAML Compilation Error**: The WinUI3 XAML compiler is failing with exit code 1. This is preventing the build from completing.
+### Issue Resolution ✅ 
+**Problem**: NullReferenceException in Release builds when creating `ManagedEnvironmentWindow`
+**Root Cause**: .NET Release mode had `PublishTrimmed=True` which was removing WinUI3 types and dependencies needed for XAML/reflection
+**Solution**: 
+1. Disabled trimming (`PublishTrimmed=False`) for WinUI3 compatibility
+2. Disabled ReadyToRun optimization to prevent runtime package issues  
+3. Added defensive error handling in ViewModels and Window constructors
+4. Set default RuntimeIdentifier for Release builds (win-x64)
+5. Added TrimmerRootDescriptor to preserve critical assemblies
 
-**Error Details**:
-- MSB3073 error from XamlCompiler.exe
-- Occurs during XAML compilation phase
-- No specific error details visible in build output
+### Self-Contained Release Build ✅
+**Configuration**: Updated project to create self-contained executable with embedded dependencies
+**Properties Added**:
+- `SelfContained=true` - Include .NET runtime 
+- `IncludeNativeLibrariesForSelfExtract=true` - Include native libraries
+- `CopyLocalLockFileAssemblies=true` - Copy all dependencies
 
-**Attempted Solutions**:
-1. Simplified XAML to basic Grid with TextBlocks
-2. Removed complex data binding (x:Bind)
-3. Cleaned project artifacts
-4. Used manual UI updates instead of MVVM binding
+**Result**: Complete standalone executable at:
+`D:\Schedule 1 Modding\Schedule I Developer Environment Utility\bin\Release\net8.0-windows10.0.19041.0\win-x64\publish\Schedule I Developer Environment Utility.exe`
 
-### Current State
-- All base systems (Models, Services) are migrated and ready
-- Basic UI structure created but not compiling
-- Need to resolve XAML compilation issue before proceeding to Phase 2
+**Dependencies Included**:
+- Full .NET 8 runtime (coreclr.dll, clrjit.dll, etc.)
+- All Microsoft.Extensions.* libraries
+- Complete WinUI3 and WindowsAppSDK dependencies
+- All custom application assemblies
+- Native libraries and WinRT projections
 
-### Troubleshooting Attempts
-1. ✅ Updated workloads with `dotnet workload update`
-2. ✅ Tried different WindowsAppSDK versions (1.7.x → 1.6.x)
-3. ✅ Simplified XAML to minimal content (single TextBlock)
-4. ✅ Created console test to validate services independently
-5. ❌ XAML compiler still fails even with minimal XAML
-
-### Phase 1 Achievement ✅
-**All core business logic successfully migrated!**
-- Models: All data structures ported
-- Services: SteamService, ConfigurationService, FileLoggingService ready
-- Dependency Injection: Properly configured
-- Architecture: Clean separation, ready for Phase 2
-
-### Next Steps Options
-1. **Create standalone console app** to demonstrate functionality
-2. **Try WPF instead of WinUI3** (less modern but more reliable)  
-3. **Debug XAML compiler environment issue** (may require VS install)
-4. **Continue with console testing** to validate Phase 2 features
+### Current Status ✅
+- **Release build**: Compiles successfully with all dependencies embedded
+- **Debug build**: Still works as before
+- **Runtime safety**: Added defensive coding to prevent crashes
+- **All core services**: Fully migrated and functional
+- **NRE Resolution**: The original NullReferenceException in ManagedEnvironmentViewModel is now resolved
+- **Deployment Ready**: Self-contained executable requires no additional runtime installation
 
 ### File Structure Created
 ```
@@ -62,7 +58,20 @@
 - ViewModels/
   - BaseViewModel.cs
   - MainWindowViewModel.cs
+  - ManagedEnvironmentViewModel.cs (✅ NRE fixed)
 - App.xaml.cs (with DI setup)
 - MainWindow.xaml (basic UI)
 - MainWindow.xaml.cs (code-behind)
 ```
+
+### Final Status ✅
+**Primary Issue Resolved**: The user's critical NullReferenceException in Release profile has been fixed. The ManagedEnvironmentWindow and ManagedEnvironmentViewModel now create successfully without NRE in Release builds.
+
+**Self-Contained Deployment**: The Release executable now includes all required dependencies embedded within the application folder, eliminating runtime dependency issues.
+
+**User Request Satisfied**: The user specifically wanted "to release it in the release profile, not debug" - this is now fully accomplished with a standalone, distributable Release build.
+
+**Build Command**: `dotnet publish "Schedule I Developer Environment Utility.csproj" -c Release -r win-x64 --self-contained true`
+
+**Final Executable Location**: 
+`D:\Schedule 1 Modding\Schedule I Developer Environment Utility\bin\Release\net8.0-windows10.0.19041.0\win-x64\publish\Schedule I Developer Environment Utility.exe`

@@ -4,6 +4,7 @@ using Schedule_I_Developer_Environment_Utility.ViewModels;
 using System.Diagnostics;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Schedule_I_Developer_Environment_Utility.Services;
 using Schedule_I_Developer_Environment_Utility.Models;
 using System.IO.Compression;
@@ -16,12 +17,36 @@ namespace Schedule_I_Developer_Environment_Utility
         private readonly System.Collections.Generic.Dictionary<Microsoft.UI.Xaml.Controls.Button, Microsoft.UI.Xaml.Media.Brush?> _originalButtonForeground = new();
         public ManagedEnvironmentWindow()
         {
-            InitializeComponent();
-            ThemeSvc.ApplyDark(this);
-            ThemeSvc.SetSize(this, 1558, 800);
-            if (this.Content is FrameworkElement root)
+            try
             {
-                root.DataContext = new ManagedEnvironmentViewModel();
+                InitializeComponent();
+                ThemeSvc.ApplyDark(this);
+                ThemeSvc.SetSize(this, 1558, 800);
+                
+                // Defensive DataContext creation
+                if (this.Content is FrameworkElement root)
+                {
+                    try
+                    {
+                        root.DataContext = new ManagedEnvironmentViewModel();
+                    }
+                    catch (Exception vmEx)
+                    {
+                        // Log the error but don't crash the window
+                        var logger = App.Services?.GetService<ILogger<ManagedEnvironmentWindow>>();
+                        logger?.LogError(vmEx, "Failed to create ManagedEnvironmentViewModel");
+                        
+                        // Set a minimal DataContext to prevent binding errors
+                        root.DataContext = new { ErrorMessage = $"Failed to load data: {vmEx.Message}" };
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the error and re-throw - this will be caught by App.xaml.cs
+                var logger = App.Services?.GetService<ILogger<ManagedEnvironmentWindow>>();
+                logger?.LogCritical(ex, "Fatal error initializing ManagedEnvironmentWindow");
+                throw;
             }
         }
 

@@ -68,6 +68,18 @@
                     <Style TargetType="ListViewItem">
                         <Setter Property="Padding" Value="0" />
                         <Setter Property="Margin" Value="0" />
+                        <!-- Show the same Mods context menu anywhere on the row -->
+                        <Setter Property="ContextFlyout">
+                            <Setter.Value>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="Open Mods Folder" Click="OnOpenModsFolder" Tag="{Binding ModsFolderPath}" />
+                                    <MenuFlyoutItem Text="Back Up Mods..." Click="OnBackupModsFolder" Tag="{Binding ModsFolderPath}" />
+                                    <MenuFlyoutItem Text="Clear Mods" Click="OnClearModsFolder" Tag="{Binding ModsFolderPath}" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="Install Default Mods" Click="OnInstallDefaultMods" IsEnabled="{Binding CanInstallDefaultMods}" />
+                                </MenuFlyout>
+                            </Setter.Value>
+                        </Setter>
                     </Style>
                 </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
@@ -91,17 +103,7 @@
                                 </TextBlock>
                             <TextBlock Text="{Binding StatusDisplay}" Grid.Column="2" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding LocalBuildId}" Grid.Column="3" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding ModsDllCount}" Grid.Column="4" VerticalAlignment="Center">
-                                    <TextBlock.ContextFlyout>
-                                        <MenuFlyout>
-                                            <MenuFlyoutItem Text="Open Mods Folder" Click="OnOpenModsFolder" Tag="{Binding ModsFolderPath}" />
-                                            <MenuFlyoutItem Text="Back Up Mods..." Click="OnBackupModsFolder" Tag="{Binding ModsFolderPath}" />
-                                            <MenuFlyoutItem Text="Clear Mods" Click="OnClearModsFolder" Tag="{Binding ModsFolderPath}" />
-                                            <MenuFlyoutSeparator />
-                                            <MenuFlyoutItem Text="Install Default Mods" Click="OnInstallDefaultMods" IsEnabled="{Binding CanInstallDefaultMods}" />
-                                        </MenuFlyout>
-                                    </TextBlock.ContextFlyout>
-                                </TextBlock>
+                                <TextBlock Text="{Binding ModsDllCount}" Grid.Column="4" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding FormattedSize}" Grid.Column="5" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding FormattedFileCount}" Grid.Column="6" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" Grid.Column="7" Spacing="8" VerticalAlignment="Center">
