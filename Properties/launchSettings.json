@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Schedule I Developer Environment Utility (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Schedule I Developer Environment Utility (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
