@@ -10,6 +10,7 @@ namespace Schedule_I_Developer_Environment_Utility
     public sealed partial class SetupWizardWindow : Window
     {
         private SetupWizardViewModel _vm;
+        private ManagedEnvironmentWindow? _parentManagedWindow;
 
         public SetupWizardWindow()
         {
@@ -20,6 +21,14 @@ namespace Schedule_I_Developer_Environment_Utility
             {
                 _vm = new SetupWizardViewModel();
                 root.DataContext = _vm;
+                // Keep UI in sync with VM state changes (StepIndex/CopyCompleted)
+                _vm.PropertyChanged += (s, e) =>
+                {
+                    if (e.PropertyName == nameof(_vm.StepIndex) || e.PropertyName == nameof(_vm.CopyCompleted))
+                    {
+                        try { DispatcherQueue.TryEnqueue(UpdateStepUI); } catch { UpdateStepUI(); }
+                    }
+                };
                 // Toggle DetectedBranch panel visibility based on VM state
                 if (root.FindName("DetectedBranchPanel") is FrameworkElement detectedPanel)
                 {
@@ -63,8 +72,9 @@ namespace Schedule_I_Developer_Environment_Utility
             UpdateStepUI();
         }
 
-        public SetupWizardWindow(string branchToInstall, string gamePath, string managedPath, bool autoClose = true) : this()
+        public SetupWizardWindow(string branchToInstall, string gamePath, string managedPath, bool autoClose = true, ManagedEnvironmentWindow? parentWindow = null) : this()
         {
+            _parentManagedWindow = parentWindow;
             try { _vm.StartHeadlessInstallAsync(branchToInstall, gamePath, managedPath, autoClose); } catch { }
             // Auto-close when copy completes in auto mode
             _vm.PropertyChanged += (s, e) =>
@@ -75,13 +85,13 @@ namespace Schedule_I_Developer_Environment_Utility
                     {
                         DispatcherQueue.TryEnqueue(() =>
                         {
-                            try { new ManagedEnvironmentWindow().Activate(); } catch { }
+                            try { _parentManagedWindow?.RefreshView(); } catch { }
                             this.Close();
                         });
                     }
                     catch
                     {
-                        try { new ManagedEnvironmentWindow().Activate(); } catch { }
+                        try { _parentManagedWindow?.RefreshView(); } catch { }
                         this.Close();
                     }
                 }
@@ -100,6 +110,15 @@ namespace Schedule_I_Developer_Environment_Utility
 
             BackButton.IsEnabled = _vm.StepIndex > 0;
             NextButton.Visibility = _vm.StepIndex < 5 ? Visibility.Visible : Visibility.Collapsed;
+            // Disable Next while copying (Step 4) and re-enable when copy completes
+            if (_vm.StepIndex == 4)
+            {
+                NextButton.IsEnabled = _vm.CopyCompleted;
+            }
+            else
+            {
+                NextButton.IsEnabled = true;
+            }
             FinishButton.Visibility = _vm.StepIndex == 5 ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -142,6 +161,8 @@ namespace Schedule_I_Developer_Environment_Utility
         private void OnRecheckBranch(object sender, RoutedEventArgs e)
         {
             _vm.RecheckInstalledBranch();
+            // If Recheck advanced the wizard (StepIndex may change to 4), reflect it immediately
+            UpdateStepUI();
         }
 
         private void OnGameFolderSelectionChanged(object sender, SelectionChangedEventArgs e)

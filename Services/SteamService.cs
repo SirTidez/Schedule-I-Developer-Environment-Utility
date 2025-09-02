@@ -357,64 +357,20 @@ namespace Schedule_I_Developer_Environment_Utility.Services
         {
             try
             {
-                // The manifest format is similar to JSON but with specific Steam formatting
-                // We need to find the UserConfig section and extract the BetaKey value
-                
-                // Look for UserConfig section
-                var userConfigStart = manifestContent.IndexOf("\"UserConfig\"");
-                if (userConfigStart == -1)
-                {
-                    _logger.LogWarning("UserConfig section not found in manifest");
-                    return null;
-                }
+                // Steam VDF keys are typically lowercase; search case-insensitively for betakey anywhere
+                var betaKeyMatch = System.Text.RegularExpressions.Regex.Match(
+                    manifestContent,
+                    "\"betakey\"\\s+\"([^\"]*)\"",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-                // Find the opening brace of UserConfig
-                var braceStart = manifestContent.IndexOf('{', userConfigStart);
-                if (braceStart == -1)
-                {
-                    _logger.LogWarning("UserConfig opening brace not found");
-                    return null;
-                }
-
-                // Find the closing brace of UserConfig
-                var braceCount = 0;
-                var braceEnd = -1;
-                for (int i = braceStart; i < manifestContent.Length; i++)
-                {
-                    if (manifestContent[i] == '{')
-                        braceCount++;
-                    else if (manifestContent[i] == '}')
-                    {
-                        braceCount--;
-                        if (braceCount == 0)
-                        {
-                            braceEnd = i;
-                            break;
-                        }
-                    }
-                }
-
-                if (braceEnd == -1)
-                {
-                    _logger.LogWarning("UserConfig closing brace not found");
-                    return null;
-                }
-
-                // Extract the UserConfig section content
-                var userConfigContent = manifestContent.Substring(braceStart, braceEnd - braceStart + 1);
-                
-                // Look for BetaKey in the UserConfig section
-                var betaKeyMatch = System.Text.RegularExpressions.Regex.Match(userConfigContent, "\"BetaKey\"\\s+\"([^\"]+)\"");
                 if (betaKeyMatch.Success)
                 {
-                    var betaKey = betaKeyMatch.Groups[1].Value.Trim().ToLower();
-                    _logger.LogInformation("Found BetaKey in manifest: {BetaKey}", betaKey);
-                    
-                    // Map the beta key to our branch names
+                    var betaKey = betaKeyMatch.Groups[1].Value?.Trim() ?? string.Empty;
+                    _logger.LogInformation("Found betakey in manifest: {BetaKey}", string.IsNullOrEmpty(betaKey) ? "<empty>" : betaKey);
                     return MapBetaKeyToBranch(betaKey);
                 }
 
-                _logger.LogInformation("No BetaKey found in UserConfig section");
+                _logger.LogInformation("No betakey found in manifest; branch may be main/stable");
                 return null;
             }
             catch (Exception ex)
@@ -438,6 +394,8 @@ namespace Schedule_I_Developer_Environment_Utility.Services
                 case "alternate-beta":
                 case "alternatebeta":
                     return "alternate-beta-branch";
+                case "public":
+                case "default":
                 case "main":
                 case "stable":
                 case "release":

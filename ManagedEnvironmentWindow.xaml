@@ -76,7 +76,7 @@
                             <!-- Subtle left accent for current Steam branch -->
                             <Border Width="4" HorizontalAlignment="Left" Background="#FF2B6CB0" Visibility="{Binding RowHighlightVisibility}" />
                         <Grid ColumnDefinitions="40,220,140,140,100,120,100,*" VerticalAlignment="Center" Padding="0,0,0,0">
-                                <TextBlock Text="{Binding StatusGlyph}" Grid.Column="0" FontFamily="Segoe MDL2 Assets" HorizontalAlignment="Center" Foreground="{Binding StatusBrush}">
+                                <TextBlock Text="{Binding StatusGlyph}" Grid.Column="0" FontFamily="Segoe MDL2 Assets" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{Binding StatusBrush}">
                                     <ToolTipService.ToolTip>
                                         <StackPanel>
                                             <TextBlock Text="{Binding StatusDisplay}" FontWeight="SemiBold" />
@@ -105,19 +105,45 @@
                                 <TextBlock Text="{Binding FormattedSize}" Grid.Column="5" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding FormattedFileCount}" Grid.Column="6" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" Grid.Column="7" Spacing="8" VerticalAlignment="Center">
-                                <Button Click="OnOpenBranchExe" Tag="{Binding ExecutablePath}" Width="100" Height="36" IsEnabled="{Binding IsInstalled}" Opacity="{Binding PlayOpacity}" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                                <Button Click="OnOpenBranchExe" Tag="{Binding ExecutablePath}" Width="100" Height="36" IsEnabled="{Binding IsInstalled}" Opacity="{Binding PlayOpacity}" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                        PointerEntered="OnGreenIconButtonPointerEntered" PointerExited="OnGreenIconButtonPointerExited" PointerPressed="OnGreenIconButtonPointerPressed" PointerReleased="OnGreenIconButtonPointerReleased">
                                     <FontIcon Glyph="&#xE768;" />
                                     <ToolTipService.ToolTip>
                                         <TextBlock Text="{Binding PlayTooltip}" />
                                     </ToolTipService.ToolTip>
                                 </Button>
-                                <Button Click="OnOpenBranchFolder" Tag="{Binding FolderPath}" Visibility="{Binding InstalledVisibility}" Width="100" Height="36" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                                <Button Click="OnOpenBranchFolder" Tag="{Binding FolderPath}" Visibility="{Binding InstalledVisibility}" Width="100" Height="36" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                        PointerEntered="OnBlueIconButtonPointerEntered" PointerExited="OnBlueIconButtonPointerExited" PointerPressed="OnBlueIconButtonPointerPressed" PointerReleased="OnBlueIconButtonPointerReleased">
                                     <FontIcon Glyph="&#xE8B7;" />
                                     <ToolTipService.ToolTip>
                                         <TextBlock Text="Open folder" />
                                     </ToolTipService.ToolTip>
                                 </Button>
-                                <Button Click="OnInstallBranch" Tag="{Binding BranchName}" Visibility="{Binding InstallVisibility}" Width="100" Height="36" Content="Install" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                                <Button Click="OnDeleteBranchContents" Tag="{Binding FolderPath}" Visibility="{Binding InstalledVisibility}" Width="100" Height="36" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                        PointerEntered="OnDeleteButtonPointerEntered" PointerExited="OnDeleteButtonPointerExited" PointerPressed="OnDeleteButtonPointerPressed" PointerReleased="OnDeleteButtonPointerReleased">
+                                    <FontIcon Glyph="&#xE74D;" />
+                                    <ToolTipService.ToolTip>
+                                        <TextBlock Text="Delete stored copy" />
+                                    </ToolTipService.ToolTip>
+                                </Button>
+                                <Button Click="OnInstallBranch" Tag="{Binding BranchName}" Visibility="{Binding InstallVisibility}" Width="100" Height="36" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                                    <TextBlock x:Name="InstallText" Text="Install" />
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroup x:Name="CommonStates">
+                                            <VisualState x:Name="Normal" />
+                                            <VisualState x:Name="PointerOver">
+                                                <VisualState.Setters>
+                                                    <Setter Target="InstallText.Foreground" Value="Gold" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                            <VisualState x:Name="Pressed">
+                                                <VisualState.Setters>
+                                                    <Setter Target="InstallText.Foreground" Value="Goldenrod" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                        </VisualStateGroup>
+                                    </VisualStateManager.VisualStateGroups>
+                                </Button>
                             </StackPanel>
                             </Grid>
                         </Grid>

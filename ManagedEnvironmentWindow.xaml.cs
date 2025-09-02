@@ -12,11 +12,13 @@ namespace Schedule_I_Developer_Environment_Utility
 {
     public sealed partial class ManagedEnvironmentWindow : Window
     {
+        private readonly System.Collections.Generic.Dictionary<Microsoft.UI.Xaml.Controls.Button, Microsoft.UI.Xaml.Media.Brush?> _originalIconBrushes = new();
+        private readonly System.Collections.Generic.Dictionary<Microsoft.UI.Xaml.Controls.Button, Microsoft.UI.Xaml.Media.Brush?> _originalButtonForeground = new();
         public ManagedEnvironmentWindow()
         {
             InitializeComponent();
             ThemeSvc.ApplyDark(this);
-            ThemeSvc.SetSize(this, 1450, 800);
+            ThemeSvc.SetSize(this, 1558, 800);
             if (this.Content is FrameworkElement root)
             {
                 root.DataContext = new ManagedEnvironmentViewModel();
@@ -34,6 +36,19 @@ namespace Schedule_I_Developer_Environment_Utility
             {
                 vm.Refresh();
             }
+        }
+
+        // Allow external callers (e.g., SetupWizardWindow) to refresh this view
+        public void RefreshView()
+        {
+            try
+            {
+                if (this.Content is FrameworkElement root && root.DataContext is ManagedEnvironmentViewModel vm)
+                {
+                    vm.Refresh();
+                }
+            }
+            catch { }
         }
 
         private void OnOpenBranchFolder(object sender, RoutedEventArgs e)
@@ -303,11 +318,186 @@ namespace Schedule_I_Developer_Environment_Utility
                 var managed = cfg?.ManagedEnvironmentPath ?? string.Empty;
                 if (!string.IsNullOrWhiteSpace(branch) && !string.IsNullOrWhiteSpace(game) && !string.IsNullOrWhiteSpace(managed))
                 {
-                    var wizard = new SetupWizardWindow(branch, game, managed, autoClose: true);
+                    var wizard = new SetupWizardWindow(branch, game, managed, autoClose: true, parentWindow: this);
                     wizard.Activate();
                 }
             }
             catch { }
+        }
+
+        private async void OnDeleteBranchContents(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var folderPath = (sender as FrameworkElement)?.Tag as string;
+                if (string.IsNullOrWhiteSpace(folderPath) || !System.IO.Directory.Exists(folderPath)) return;
+
+                // Confirm deletion of stored instance contents
+                var dialog = new ContentDialog
+                {
+                    Title = "Delete Stored Copy",
+                    Content = "This will remove all files and subfolders inside the branch folder, but keep the folder itself. Continue?",
+                    PrimaryButtonText = "Delete",
+                    CloseButtonText = "Cancel",
+                    XamlRoot = (this.Content as FrameworkElement)?.XamlRoot
+                };
+                var res = await dialog.ShowAsync();
+                if (res != ContentDialogResult.Primary) return;
+
+                // Delete all files and subfolders (keep root folder)
+                try
+                {
+                    foreach (var file in System.IO.Directory.EnumerateFiles(folderPath, "*", System.IO.SearchOption.TopDirectoryOnly))
+                    {
+                        try { System.IO.File.SetAttributes(file, System.IO.FileAttributes.Normal); } catch { }
+                        try { System.IO.File.Delete(file); } catch { }
+                    }
+                    foreach (var dir in System.IO.Directory.EnumerateDirectories(folderPath, "*", System.IO.SearchOption.TopDirectoryOnly))
+                    {
+                        try { System.IO.Directory.Delete(dir, true); } catch { }
+                    }
+                }
+                catch { }
+
+                // Refresh the view to reflect removal
+                OnRefreshClick(sender, e);
+            }
+            catch { }
+        }
+
+        // Icon hover/press color helpers
+        private void SetIconBrush(Microsoft.UI.Xaml.Controls.Button btn, Microsoft.UI.Xaml.Media.Brush brush)
+        {
+            try
+            {
+                if (btn.Content is Microsoft.UI.Xaml.Controls.FontIcon fi)
+                {
+                    if (!_originalIconBrushes.ContainsKey(btn))
+                    {
+                        _originalIconBrushes[btn] = fi.Foreground;
+                    }
+                    fi.Foreground = brush;
+                }
+            }
+            catch { }
+        }
+
+        private void ResetIconBrush(Microsoft.UI.Xaml.Controls.Button btn)
+        {
+            try
+            {
+                if (btn.Content is Microsoft.UI.Xaml.Controls.FontIcon fi)
+                {
+                    if (_originalIconBrushes.TryGetValue(btn, out var brush))
+                    {
+                        fi.Foreground = brush;
+                    }
+                    else
+                    {
+                        fi.ClearValue(Microsoft.UI.Xaml.Controls.FontIcon.ForegroundProperty);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        // Delete button (red palette)
+        private void OnDeleteButtonPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) SetIconBrush(b, new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.IndianRed));
+        }
+        private void OnDeleteButtonPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) ResetIconBrush(b);
+        }
+        private void OnDeleteButtonPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) SetIconBrush(b, new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Firebrick));
+        }
+        private void OnDeleteButtonPointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) SetIconBrush(b, new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.IndianRed));
+        }
+
+        // Other action buttons (blue palette)
+        private void OnBlueIconButtonPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) SetIconBrush(b, new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.DodgerBlue));
+        }
+        private void OnBlueIconButtonPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) ResetIconBrush(b);
+        }
+        private void OnBlueIconButtonPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) SetIconBrush(b, new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.SteelBlue));
+        }
+        private void OnBlueIconButtonPointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) SetIconBrush(b, new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.DodgerBlue));
+        }
+
+        // Play button (green palette)
+        private void OnGreenIconButtonPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) SetIconBrush(b, new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.LimeGreen));
+        }
+        private void OnGreenIconButtonPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) ResetIconBrush(b);
+        }
+        private void OnGreenIconButtonPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) SetIconBrush(b, new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.ForestGreen));
+        }
+        private void OnGreenIconButtonPointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) SetIconBrush(b, new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.LimeGreen));
+        }
+
+        // Install button (yellow text)
+        private void SetButtonForeground(Microsoft.UI.Xaml.Controls.Button btn, Microsoft.UI.Xaml.Media.Brush brush)
+        {
+            try
+            {
+                if (!_originalButtonForeground.ContainsKey(btn))
+                {
+                    _originalButtonForeground[btn] = btn.Foreground;
+                }
+                btn.Foreground = brush;
+            }
+            catch { }
+        }
+        private void ResetButtonForeground(Microsoft.UI.Xaml.Controls.Button btn)
+        {
+            try
+            {
+                if (_originalButtonForeground.TryGetValue(btn, out var brush))
+                {
+                    btn.Foreground = brush;
+                }
+                else
+                {
+                    btn.ClearValue(Microsoft.UI.Xaml.Controls.Button.ForegroundProperty);
+                }
+            }
+            catch { }
+        }
+        private void OnYellowButtonPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) SetButtonForeground(b, new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gold));
+        }
+        private void OnYellowButtonPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) ResetButtonForeground(b);
+        }
+        private void OnYellowButtonPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) SetButtonForeground(b, new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Goldenrod));
+        }
+        private void OnYellowButtonPointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button b) SetButtonForeground(b, new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gold));
         }
     }
 }
