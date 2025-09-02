@@ -3,7 +3,9 @@
     "allow": [
       "Bash(mkdir:*)",
       "Bash(dotnet build:*)",
-      "Bash(dotnet:*)"
+      "Bash(dotnet:*)",
+      "Bash(\"Schedule I Developer Environment Utility.exe\")",
+      "Bash(./Schedule I Developer Environment Utility.exe)"
     ],
     "deny": [],
     "ask": []
