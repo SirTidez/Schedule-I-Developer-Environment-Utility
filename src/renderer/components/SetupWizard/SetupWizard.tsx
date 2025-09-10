@@ -1,3 +1,23 @@
+/**
+ * Setup Wizard Component for Schedule I Developer Environment Utility
+ * 
+ * Multi-step setup wizard that guides users through the initial configuration
+ * of the development environment. Handles Steam library selection, environment
+ * path configuration, branch selection, file copying, and setup completion.
+ * 
+ * Key features:
+ * - Multi-step navigation with progress indicators
+ * - Steam library detection and selection
+ * - Environment path configuration
+ * - Branch selection with build information
+ * - File copying with progress tracking
+ * - Setup completion and summary
+ * - Validation and error handling
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.0.0
+ */
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LibrarySelectionStep from './steps/LibrarySelectionStep';
@@ -6,6 +26,15 @@ import BranchSelectionStep from './steps/BranchSelectionStep';
 import CopyProgressStep from './steps/CopyProgressStep';
 import SummaryStep from './steps/SummaryStep';
 
+/**
+ * Setup Wizard component
+ * 
+ * Provides a guided multi-step setup process for configuring the development
+ * environment. Manages state across all steps and handles navigation between
+ * them with proper validation.
+ * 
+ * @returns JSX element containing the setup wizard interface
+ */
 const SetupWizard: React.FC = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);

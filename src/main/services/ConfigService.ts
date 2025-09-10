@@ -1,14 +1,51 @@
+/**
+ * Configuration Service for Schedule I Developer Environment Utility
+ * 
+ * Manages application configuration using electron-store for persistence and
+ * provides validation, file I/O operations, and path management. Maintains
+ * compatibility with the original C# application's configuration format.
+ * 
+ * Key features:
+ * - Persistent configuration storage using electron-store
+ * - Configuration validation and error reporting
+ * - File-based configuration backup and restore
+ * - Path management for managed environments
+ * - Build ID tracking for branches
+ * - Custom launch command management
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.0.0
+ */
+
 import Store from 'electron-store';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
 import { DevEnvironmentConfig, BranchBuildInfo } from '../../shared/types';
 
+/**
+ * Configuration Service class for managing application settings
+ * 
+ * Provides comprehensive configuration management including storage, validation,
+ * and file operations. Uses the same configuration path as the original C# application.
+ */
 export class ConfigService {
+  /** Electron store instance for configuration persistence */
   private store: any;
+  
+  /** Path to the configuration file */
   private configPath: string;
+  
+  /** Path to the logs directory */
   private logsPath: string;
   
+  /**
+   * Initializes the configuration service
+   * 
+   * Sets up the configuration directory structure, initializes the electron-store
+   * with default values, and loads existing configuration from file if available.
+   * Uses the same configuration path as the original C# application for compatibility.
+   */
   constructor() {
     // Use the same config path as the C# application
     const configDir = path.join(os.homedir(), 'AppData', 'LocalLow', 'TVGS', 'Development Environment Manager');
@@ -31,6 +68,14 @@ export class ConfigService {
     this.loadConfigFromFile();
   }
   
+  /**
+   * Gets the default configuration object
+   * 
+   * Returns a configuration object with default values for all required fields.
+   * This ensures the application has valid configuration even on first run.
+   * 
+   * @returns DevEnvironmentConfig Default configuration object
+   */
   private getDefaultConfig(): DevEnvironmentConfig {
     return {
       steamLibraryPath: '',
@@ -45,10 +90,23 @@ export class ConfigService {
     };
   }
   
+  /**
+   * Gets the current configuration
+   * 
+   * @returns DevEnvironmentConfig Current configuration object
+   */
   getConfig(): DevEnvironmentConfig {
     return this.store.store;
   }
   
+  /**
+   * Updates the configuration with new values
+   * 
+   * Merges the provided updates with the current configuration and updates
+   * the lastUpdated timestamp. Saves changes to both the store and file.
+   * 
+   * @param updates Partial configuration object with updates
+   */
   updateConfig(updates: Partial<DevEnvironmentConfig>): void {
     const currentConfig = this.getConfig();
     const updatedConfig = {

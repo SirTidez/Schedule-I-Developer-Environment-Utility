@@ -1,3 +1,22 @@
+/**
+ * Main Application Component for Schedule I Developer Environment Utility
+ * 
+ * The root component that manages application routing, configuration validation,
+ * and determines whether to show the setup wizard or managed environment interface.
+ * Handles the initial application state and provides the main navigation structure.
+ * 
+ * Key features:
+ * - Configuration validation and loading
+ * - Conditional routing based on configuration state
+ * - Setup wizard for initial configuration
+ * - Managed environment for ongoing use
+ * - Custom title bar with window controls
+ * - Loading states and error handling
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.0.0
+ */
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import SetupWizard from './components/SetupWizard/SetupWizard';
@@ -8,6 +27,15 @@ import DefaultModsProgress from './components/DefaultModsProgress/DefaultModsPro
 import { CustomTitleBar } from './components/CustomTitleBar/CustomTitleBar';
 import { useConfigValidation } from './hooks/useConfigValidation';
 
+/**
+ * Main application content component
+ * 
+ * Handles configuration validation, determines the appropriate interface to show,
+ * and manages the application's initial state. Shows either the setup wizard for
+ * new users or the managed environment for configured users.
+ * 
+ * @returns JSX element containing the main application interface
+ */
 const AppContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [shouldShowManagedEnvironment, setShouldShowManagedEnvironment] = useState(false);
@@ -92,6 +120,14 @@ const AppContent: React.FC = () => {
   );
 };
 
+/**
+ * Root App component with routing
+ * 
+ * Wraps the main application content with React Router to provide
+ * client-side routing functionality throughout the application.
+ * 
+ * @returns JSX element containing the routed application
+ */
 const App: React.FC = () => {
   return (
     <Router>

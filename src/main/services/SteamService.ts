@@ -1,17 +1,63 @@
+/**
+ * Steam Service for Schedule I Developer Environment Utility
+ * 
+ * Handles all Steam-related operations including library detection, app manifest parsing,
+ * branch detection, and game management. This service provides the core functionality
+ * for detecting Steam installations and managing Schedule I game branches.
+ * 
+ * Key features:
+ * - Automatic Steam library detection across multiple drives
+ * - App manifest parsing for build information
+ * - Branch detection and verification
+ * - Cross-platform Steam installation detection
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.0.0
+ */
+
 import * as fs from 'fs-extra';
 import * as path from 'path';
 
+/**
+ * Interface representing a Steam app manifest
+ * 
+ * Contains essential information about a Steam application including
+ * build ID, name, state, and last update timestamp.
+ */
 export interface AppManifest {
+  /** The build ID of the application */
   buildId: number;
+  /** The display name of the application */
   name: string;
+  /** The current state of the application */
   state: number;
+  /** Unix timestamp of the last update */
   lastUpdated: number;
 }
 
+/**
+ * Steam Service class for managing Steam-related operations
+ * 
+ * Provides comprehensive functionality for detecting Steam installations,
+ * parsing app manifests, and managing game branches for Schedule I.
+ */
 export class SteamService {
+  /** Array of detected Steam library paths */
   private steamPaths: string[] = [];
-  private static readonly SCHEDULE_I_APP_ID = '3164500'; // Schedule I Steam App ID
   
+  /** Schedule I Steam App ID - constant identifier for the game */
+  private static readonly SCHEDULE_I_APP_ID = '3164500';
+  
+  /**
+   * Detects all Steam library folders on the system
+   * 
+   * Searches for Steam installations in common locations and reads the libraryfolders.vdf
+   * file to discover all Steam library folders, including the default library and any
+   * additional libraries on other drives.
+   * 
+   * @returns Promise<string[]> Array of Steam library paths (steamapps folders)
+   * @throws Error if Steam installation cannot be found or accessed
+   */
   async detectSteamLibraries(): Promise<string[]> {
     try {
       console.log('Detecting Steam libraries...');
@@ -73,6 +119,15 @@ export class SteamService {
     }
   }
   
+  /**
+   * Finds the Steam installation path on the system
+   * 
+   * Searches common Steam installation locations including Program Files,
+   * Program Files (x86), and LocalAppData. Checks for the presence of
+   * steam.exe to confirm a valid Steam installation.
+   * 
+   * @returns Promise<string | null> Steam installation path or null if not found
+   */
   private async findSteamInstallPath(): Promise<string | null> {
     const possiblePaths = [
       path.join(process.env.PROGRAMFILES || '', 'Steam'),
@@ -89,6 +144,15 @@ export class SteamService {
     return null;
   }
   
+  /**
+   * Parses Steam libraryfolders.vdf content to extract library paths
+   * 
+   * Extracts library paths from the VDF (Valve Data Format) file content
+   * by searching for "path" entries and extracting the quoted values.
+   * 
+   * @param content The raw content of the libraryfolders.vdf file
+   * @returns string[] Array of library paths
+   */
   private parseLibraryFolders(content: string): string[] {
     const libraries: string[] = [];
     const lines = content.split('\n');
@@ -105,6 +169,17 @@ export class SteamService {
     return libraries;
   }
   
+  /**
+   * Parses a Steam app manifest file for the specified app ID
+   * 
+   * Reads and parses the ACF (Application Cache File) manifest for a specific
+   * Steam application, extracting build information and metadata.
+   * 
+   * @param appId The Steam App ID to parse
+   * @param libraryPath The Steam library path containing the manifest
+   * @returns Promise<AppManifest> Parsed manifest data
+   * @throws Error if manifest file is not found or cannot be read
+   */
   async parseAppManifest(appId: string, libraryPath: string): Promise<AppManifest> {
     const manifestPath = path.join(libraryPath, 'steamapps', `appmanifest_${appId}.acf`);
     
@@ -116,6 +191,15 @@ export class SteamService {
     return this.parseACFContent(content);
   }
   
+  /**
+   * Parses ACF (Application Cache File) content to extract app manifest data
+   * 
+   * Uses regex patterns to extract build ID, name, state flags, and last updated
+   * timestamp from the ACF file content. Provides fallback values for missing data.
+   * 
+   * @param content The raw ACF file content
+   * @returns AppManifest Parsed manifest data with fallback values
+   */
   private parseACFContent(content: string): AppManifest {
     // Parse ACF format (similar to original C# implementation)
     const buildIdMatch = content.match(/"buildid"\s+"(\d+)"/);

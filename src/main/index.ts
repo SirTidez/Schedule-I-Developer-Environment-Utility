@@ -1,3 +1,17 @@
+/**
+ * Main Electron process entry point for Schedule I Developer Environment Utility
+ * 
+ * This file initializes the Electron application, sets up IPC handlers for communication
+ * between main and renderer processes, and manages the application lifecycle.
+ * 
+ * Key responsibilities:
+ * - Initialize core services (Config, Logging, Update)
+ * - Set up IPC communication handlers
+ * - Create and manage the main application window
+ * - Handle application lifecycle events
+ * - Configure security settings
+ */
+
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import { setupSteamHandlers } from './ipc/steamHandlers';
@@ -13,7 +27,7 @@ import { UpdateService } from './services/UpdateService';
 
 const isDev = process.env.NODE_ENV === 'development';
 
-// Initialize services
+// Initialize core services
 const configService = new ConfigService();
 const loggingService = new LoggingService(configService);
 const updateService = new UpdateService(loggingService, configService.getConfigDir());
@@ -39,69 +53,96 @@ const updateService = new UpdateService(loggingService, configService.getConfigD
   }
 })();
 
+/**
+ * Creates and configures the main application window
+ * 
+ * Sets up a frameless window with custom title bar, configures security settings,
+ * and loads the appropriate content based on the environment (dev vs production).
+ * 
+ * Security features:
+ * - Context isolation enabled
+ * - Node integration disabled
+ * - Preload script for secure API exposure
+ * 
+ * @returns void
+ */
 function createWindow(): void {
-  // Create the browser window
+  // Create the browser window with custom configuration
   const mainWindow = new BrowserWindow({
     width: 1000,
     height: 700,
     minWidth: 800,
     minHeight: 600,
-    frame: false, // Hide the default window frame
+    frame: false, // Hide the default window frame for custom title bar
     titleBarStyle: 'hidden', // Hide the title bar
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, '../preload/index.js'),
+      nodeIntegration: false, // Security: disable node integration in renderer
+      contextIsolation: true, // Security: enable context isolation
+      preload: path.join(__dirname, '../preload/index.js'), // Secure API exposure
     },
     icon: path.join(__dirname, '../../assets/icon.png'),
     title: `Schedule I Developer Environment v${app.getVersion()}`,
-    show: false,
+    show: false, // Don't show until ready
   });
 
-  // Start the window maximized
+  // Start the window maximized for better user experience
   mainWindow.maximize();
 
-  // Load the app
+  // Load the appropriate content based on environment
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
-    mainWindow.webContents.openDevTools();
+    mainWindow.webContents.openDevTools(); // Open dev tools in development
   } else {
     mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
   }
 
-  // Show window when ready
+  // Show window when ready to prevent flash of white content
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
   });
 
-  // Handle window closed
+  // Handle window closed event
   mainWindow.on('closed', () => {
-    // Dereference the window object
+    // Dereference the window object (optional cleanup)
   });
 }
 
-// This method will be called when Electron has finished initialization
-app.whenReady().then(() => {
-  // Setup IPC handlers
-  setupSteamHandlers();
-  setupConfigHandlers();
-  setupFileHandlers();
-  setupDialogHandlers();
-  registerUpdateHandlers(updateService, loggingService);
-  registerShellHandlers(loggingService);
-  registerWindowHandlers(loggingService);
+/**
+ * Application initialization and lifecycle management
+ * 
+ * Sets up IPC handlers, creates the main window, and configures application
+ * lifecycle events including platform-specific behavior for macOS.
+ */
 
+// Initialize application when Electron is ready
+app.whenReady().then(() => {
+  // Register all IPC handlers for communication with renderer process
+  setupSteamHandlers(); // Steam library detection and management
+  setupConfigHandlers(); // Configuration management
+  setupFileHandlers(); // File operations
+  setupDialogHandlers(); // Native dialog boxes
+  registerUpdateHandlers(updateService, loggingService); // Update checking
+  registerShellHandlers(loggingService); // External URL opening
+  registerWindowHandlers(loggingService); // Window management
+
+  // Create the main application window
   createWindow();
 
+  // Handle macOS dock icon click behavior
   app.on('activate', () => {
-    // On macOS, re-create window when dock icon is clicked
+    // On macOS, re-create window when dock icon is clicked and no windows exist
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
 });
 
-// Quit when all windows are closed
+/**
+ * Handle application quit behavior
+ * 
+ * On macOS, applications typically stay running even when all windows are closed.
+ * On other platforms, the application quits when all windows are closed.
+ */
 app.on('window-all-closed', () => {
   // On macOS, keep app running even when all windows are closed
   if (process.platform !== 'darwin') {
@@ -109,7 +150,12 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Security: Prevent new window creation
+/**
+ * Security: Prevent unauthorized window creation
+ * 
+ * This prevents malicious websites from creating new windows or popups
+ * by denying all window creation requests from web contents.
+ */
 app.on('web-contents-created', (event, contents) => {
   contents.setWindowOpenHandler(() => {
     return { action: 'deny' };

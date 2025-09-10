@@ -1,31 +1,88 @@
+/**
+ * Update Service for Schedule I Developer Environment Utility
+ * 
+ * Handles application update checking by fetching release information from GitHub.
+ * Provides version comparison, release note formatting, and caching functionality
+ * to minimize API calls and improve performance.
+ * 
+ * Key features:
+ * - GitHub API integration for release checking
+ * - Semantic version comparison
+ * - Release note formatting and cleanup
+ * - Update caching with 24-hour validity
+ * - Support for pre-release versions
+ * - Fallback version detection from package.json
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.0.0
+ */
+
 import { app } from 'electron';
 import { LoggingService } from './LoggingService';
 import { UpdateCacheService } from './UpdateCacheService';
 
+/**
+ * Interface representing a GitHub release
+ * 
+ * Contains all relevant information about a GitHub release including
+ * version tag, name, description, publication date, and download assets.
+ */
 export interface GitHubRelease {
+  /** Release tag (e.g., "v1.0.0", "beta") */
   tag_name: string;
+  /** Release name/title */
   name: string;
+  /** Release description/body */
   body: string;
+  /** Publication date in ISO format */
   published_at: string;
+  /** URL to the release page */
   html_url: string;
+  /** Array of downloadable assets */
   assets: Array<{
+    /** Asset filename */
     name: string;
+    /** Direct download URL */
     browser_download_url: string;
+    /** File size in bytes */
     size: number;
   }>;
 }
 
+/**
+ * Interface representing update information
+ * 
+ * Contains the result of an update check including whether an update
+ * is available, current and latest versions, and release details.
+ */
 export interface UpdateInfo {
+  /** Whether an update is available */
   hasUpdate: boolean;
+  /** Current application version */
   currentVersion: string;
+  /** Latest available version */
   latestVersion: string;
+  /** GitHub release information (only if update available) */
   release?: GitHubRelease;
 }
 
+/**
+ * Update Service class for managing application updates
+ * 
+ * Provides comprehensive update checking functionality with caching,
+ * version comparison, and release information management.
+ */
 export class UpdateService {
+  /** GitHub repository identifier */
   private readonly GITHUB_REPO = 'SirTidez/Schedule-I-Developer-Environment-Utility';
+  
+  /** GitHub API URL for releases */
   private readonly GITHUB_API_URL = `https://api.github.com/repos/${this.GITHUB_REPO}/releases`;
+  
+  /** Logging service instance */
   private readonly loggingService: LoggingService;
+  
+  /** Update cache service instance */
   private readonly cacheService: UpdateCacheService;
 
   constructor(loggingService: LoggingService, configDir: string) {

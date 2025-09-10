@@ -1,6 +1,34 @@
+/**
+ * Configuration Service Hook for Schedule I Developer Environment Utility
+ * 
+ * Custom React hook that provides configuration management functionality to components.
+ * Handles loading, updating, and managing application configuration with proper
+ * state management, error handling, and automatic configuration loading.
+ * 
+ * Key features:
+ * - Configuration loading and updating
+ * - Managed environment path management
+ * - Build ID tracking for branches
+ * - Automatic configuration loading on mount
+ * - Error handling with user-friendly messages
+ * - Loading states for async operations
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.0.0
+ */
+
 import { useState, useCallback, useEffect } from 'react';
 import { DevEnvironmentConfig } from '../../shared/types';
 
+/**
+ * Custom hook for configuration service operations
+ * 
+ * Provides a comprehensive interface for configuration management including
+ * loading, updating, and path management. Includes proper state management,
+ * error handling, and automatic configuration loading on component mount.
+ * 
+ * @returns Object containing configuration service methods and state
+ */
 export const useConfigService = () => {
   const [config, setConfig] = useState<DevEnvironmentConfig | null>(null);
   const [loading, setLoading] = useState(false);

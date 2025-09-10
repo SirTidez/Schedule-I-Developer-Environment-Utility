@@ -1,8 +1,34 @@
+/**
+ * Steam IPC Handlers for Schedule I Developer Environment Utility
+ * 
+ * Provides IPC communication handlers for all Steam-related operations.
+ * These handlers bridge the gap between the renderer process and the
+ * SteamService in the main process, enabling secure communication.
+ * 
+ * Handled operations:
+ * - Steam library detection
+ * - App manifest parsing
+ * - Branch detection and verification
+ * - Build ID management
+ * - Game library management
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.0.0
+ */
+
 import { ipcMain } from 'electron';
 import { SteamService } from '../services/SteamService';
 
+/** Steam service instance for handling Steam operations */
 const steamService = new SteamService();
 
+/**
+ * Sets up all Steam-related IPC handlers
+ * 
+ * Registers handlers for Steam library detection, app manifest parsing,
+ * branch management, and other Steam-related operations. All handlers
+ * include proper error handling and logging.
+ */
 export function setupSteamHandlers() {
   ipcMain.handle('steam:detect-libraries', async () => {
     try {

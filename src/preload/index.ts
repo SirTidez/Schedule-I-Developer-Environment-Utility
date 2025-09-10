@@ -1,7 +1,38 @@
+/**
+ * Preload Script for Schedule I Developer Environment Utility
+ * 
+ * This script runs in a secure context between the main process and renderer process.
+ * It exposes a controlled API to the renderer process, preventing direct access to
+ * Node.js APIs while enabling secure communication with the main process.
+ * 
+ * Security features:
+ * - Context isolation enabled
+ * - No direct Node.js access from renderer
+ * - Controlled API exposure through contextBridge
+ * - Type-safe interfaces for all exposed methods
+ * 
+ * Exposed APIs:
+ * - Steam operations (library detection, manifest parsing)
+ * - Configuration management
+ * - File operations with progress tracking
+ * - Dialog boxes (open/save files)
+ * - Update checking
+ * - Shell operations (external URLs)
+ * - Window management
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.0.0
+ */
+
 import { contextBridge, ipcRenderer } from 'electron';
 
-// Expose protected methods that allow the renderer process to use
-// the ipcRenderer without exposing the entire object
+/**
+ * Exposes secure APIs to the renderer process
+ * 
+ * Uses contextBridge to safely expose IPC methods to the renderer process
+ * without giving it direct access to Node.js APIs or the full ipcRenderer.
+ * This maintains security while enabling necessary functionality.
+ */
 contextBridge.exposeInMainWorld('electronAPI', {
   steam: {
     detectLibraries: () => ipcRenderer.invoke('steam:detect-libraries'),

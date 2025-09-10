@@ -1,17 +1,63 @@
+/**
+ * Steam Service Hook for Schedule I Developer Environment Utility
+ * 
+ * Custom React hook that provides Steam-related functionality to components.
+ * Handles Steam library detection, app manifest parsing, branch management,
+ * and other Steam operations with proper state management and error handling.
+ * 
+ * Key features:
+ * - Steam library detection and management
+ * - App manifest parsing for build information
+ * - Branch detection and verification
+ * - Build ID management
+ * - Error handling with user-friendly messages
+ * - Loading states for async operations
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.0.0
+ */
+
 import { useState, useCallback } from 'react';
 
+/**
+ * Interface representing a Steam library
+ * 
+ * Contains information about a Steam library including its path
+ * and validation status.
+ */
 export interface SteamLibrary {
+  /** Path to the Steam library */
   path: string;
+  /** Whether the library is valid and accessible */
   isValid: boolean;
 }
 
+/**
+ * Interface representing a Steam app manifest
+ * 
+ * Contains essential information about a Steam application including
+ * build ID, name, state, and last update timestamp.
+ */
 export interface AppManifest {
+  /** The build ID of the application */
   buildId: number;
+  /** The display name of the application */
   name: string;
+  /** The current state of the application */
   state: number;
+  /** Unix timestamp of the last update */
   lastUpdated: number;
 }
 
+/**
+ * Custom hook for Steam service operations
+ * 
+ * Provides a comprehensive interface for Steam-related operations including
+ * library detection, manifest parsing, and branch management. Includes
+ * proper state management, error handling, and loading states.
+ * 
+ * @returns Object containing Steam service methods and state
+ */
 export const useSteamService = () => {
   const [libraries, setLibraries] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
