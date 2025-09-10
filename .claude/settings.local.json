@@ -5,7 +5,9 @@
       "Bash(dotnet build:*)",
       "Bash(dotnet:*)",
       "Bash(\"Schedule I Developer Environment Utility.exe\")",
-      "Bash(./Schedule I Developer Environment Utility.exe)"
+      "Bash(./Schedule I Developer Environment Utility.exe)",
+      "Bash(dir \"bin\\Release\\net8.0-windows10.0.19041.0\\win-arm64\\publish\" /S /B)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []
