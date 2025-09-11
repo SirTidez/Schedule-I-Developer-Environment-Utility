@@ -57,11 +57,6 @@ This is the Electron-based version of the Schedule I Developer Environment Utili
 - **Manual Update Checks**: Trigger update checks via refresh button
 - **Automatic Updates**: Checks for new releases on GitHub
 
-### 🌐 **Cross-Platform**
-- **Windows**: Full support with NSIS installer and portable executable
-- **macOS**: DMG package support
-- **Linux**: AppImage support
-
 ## 🚀 Technology Stack
 
 - **Electron**: ^38.0.0 (Desktop app framework)
@@ -116,7 +111,6 @@ npm run start
 ### Build Output
 - **Development**: Built files go to `dist/` directory
 - **Packaging**: Packaged executables go to `dist-v2.0.3/` directory
-- **Legacy**: Previous v2.0.0 packages remain in `dist-v2/` directory
 
 ### Development Workflow
 1. **Start Development**: Run `npm run dev` to start both processes
@@ -179,17 +173,8 @@ The application uses electron-builder for packaging with support for multiple pl
 - **Architecture**: x64
 - **Digital Signing**: All executables are digitally signed
 
-### **macOS**
-- **DMG Package**: `Schedule I Developer Environment-2.0.3.dmg`
-- **Architecture**: Universal (Intel + Apple Silicon)
-
-### **Linux**
-- **AppImage**: `Schedule I Developer Environment-2.0.3.AppImage`
-- **Architecture**: x64
-
 ### **Package Directories**
 - **Current Version**: `dist-v2.0.3/` (v2.0.3 packages)
-- **Legacy Version**: `dist-v2/` (v2.0.0 packages)
 
 ## 🆕 Recent Changes (v2.0.3)
 
@@ -198,11 +183,6 @@ The application uses electron-builder for packaging with support for multiple pl
 - **Optimized Caching**: Latest release info cached for 1 hour instead of 24 hours
 - **Manual Update Checks**: Trigger update checks via refresh button in managed environment
 - **Better Performance**: Balanced approach between freshness and API efficiency
-
-### **Package Organization**
-- **Version-Specific Directories**: New `dist-v2.0.3/` directory for v2.0.3 packages
-- **Legacy Preservation**: Maintains `dist-v2/` directory for v2.0.0 packages
-- **Clean Separation**: Clear organization between different version releases
 
 ### **Documentation Improvements**
 - **Comprehensive Updates**: 11 source files updated with detailed documentation
