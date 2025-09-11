@@ -45,7 +45,8 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "assets/icon.png"
+      "icon": "Assets/icon.png",
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
       "oneClick": false,
@@ -55,11 +56,11 @@
     },
     "mac": {
       "target": "dmg",
-      "icon": "assets/icon.png"
+      "icon": "Assets/icon.png"
     },
     "linux": {
       "target": "AppImage",
-      "icon": "assets/icon.png"
+      "icon": "Assets/icon.png"
     }
   },
   "devDependencies": {

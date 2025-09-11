@@ -29,6 +29,9 @@ export interface BranchInfo {
   lastUpdated: number;
   isInstalled: boolean;
   isAvailable: boolean;
+  size?: string;
+  needsUpdate?: boolean;
+  steamBranchKey?: string;
 }
 
 export interface SteamGameInfo {

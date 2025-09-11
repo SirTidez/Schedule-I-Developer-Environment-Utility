@@ -67,6 +67,11 @@ const updateService = new UpdateService(loggingService, configService.getConfigD
  * @returns void
  */
 function createWindow(): void {
+  // Get the icon path for both development and production
+  const iconPath = isDev 
+    ? path.join(__dirname, '../../Assets/icon.png')
+    : path.join(__dirname, '../../Assets/icon.png');
+  
   // Create the browser window with custom configuration
   const mainWindow = new BrowserWindow({
     width: 1000,
@@ -80,7 +85,7 @@ function createWindow(): void {
       contextIsolation: true, // Security: enable context isolation
       preload: path.join(__dirname, '../preload/index.js'), // Secure API exposure
     },
-    icon: path.join(__dirname, '../../assets/icon.png'),
+    icon: iconPath,
     title: `Schedule I Developer Environment v${app.getVersion()}`,
     show: false, // Don't show until ready
   });
@@ -116,6 +121,15 @@ function createWindow(): void {
 
 // Initialize application when Electron is ready
 app.whenReady().then(() => {
+  // Set the application icon for the taskbar
+  const iconPath = path.join(__dirname, '../../Assets/icon.png');
+  app.setAppUserModelId('com.schedulei.dev-environment');
+  
+  // Set the app icon for Windows taskbar
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.schedulei.dev-environment');
+  }
+  
   // Register all IPC handlers for communication with renderer process
   setupSteamHandlers(); // Steam library detection and management
   setupConfigHandlers(); // Configuration management

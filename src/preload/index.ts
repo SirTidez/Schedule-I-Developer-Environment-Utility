@@ -91,7 +91,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   
   shell: {
-    openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url)
+    openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url),
+    launchExecutable: (executablePath: string) => ipcRenderer.invoke('shell:launch-executable', executablePath),
+    openFolder: (folderPath: string) => ipcRenderer.invoke('shell:open-folder', folderPath),
+    showItem: (itemPath: string) => ipcRenderer.invoke('shell:show-item', itemPath)
   },
   
   window: {
@@ -165,6 +168,9 @@ declare global {
       };
       shell: {
         openExternal: (url: string) => Promise<void>;
+        launchExecutable: (executablePath: string) => Promise<void>;
+        openFolder: (folderPath: string) => Promise<void>;
+        showItem: (itemPath: string) => Promise<void>;
       };
       window: {
         minimize: () => Promise<void>;

@@ -102,7 +102,7 @@ const ManagedEnvironment: React.FC = () => {
       }
 
       for (const branch of allBranches) {
-        const branchPath = `${config.managedEnvironmentPath}/branches/${branch.folderName}`;
+        const branchPath = `${config.managedEnvironmentPath}\\branches\\${branch.folderName}`;
         const isInstalled = await checkFileExists(branchPath);
         
         // Check if this branch matches the currently installed Steam branch
@@ -152,7 +152,7 @@ const ManagedEnvironment: React.FC = () => {
       const branchData = {
         branchName: branchInfo.name,
         steamBranchKey: branchInfo.steamBranchKey,
-        folderName: branchInfo.path.split('/').pop() || branchInfo.name.toLowerCase().replace(' ', '-'),
+        folderName: branchInfo.path.split('\\').pop() || branchInfo.name.toLowerCase().replace(' ', '-'),
         steamLibraryPath: config.steamLibraryPath,
         managedEnvironmentPath: config.managedEnvironmentPath,
         gameInstallPath: config.gameInstallPath
@@ -169,16 +169,49 @@ const ManagedEnvironment: React.FC = () => {
     }
   };
 
-  const handlePlayBranch = (branchName: string) => {
-    // This would launch the game from the specific branch
-    console.log('Playing branch:', branchName);
-    // In a real implementation, this would launch the game executable
+  const handlePlayBranch = async (branchInfo: BranchInfo) => {
+    try {
+      // Find the executable in the branch directory
+      const executablePath = `${branchInfo.path}\\Schedule I.exe`;
+      
+      console.log('Launching game from:', executablePath);
+      console.log('Branch info:', branchInfo);
+      
+      // Check if the executable exists first
+      const executableExists = await checkFileExists(executablePath);
+      if (!executableExists) {
+        throw new Error(`Game executable not found at: ${executablePath}`);
+      }
+      
+      // Launch the game executable
+      await window.electronAPI.shell.launchExecutable(executablePath);
+      
+      console.log('Game launched successfully');
+    } catch (error) {
+      console.error('Failed to launch game:', error);
+      setError(`Failed to launch game: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
-  const handleOpenBranchFolder = (branchPath: string) => {
-    // This would open the branch folder in the file explorer
-    console.log('Opening folder:', branchPath);
-    // In a real implementation, this would use electron's shell API
+  const handleOpenBranchFolder = async (branchPath: string) => {
+    try {
+      // Convert forward slashes to backslashes for Windows compatibility
+      const normalizedPath = branchPath.replace(/\//g, '\\');
+      console.log('Opening folder:', normalizedPath);
+      console.log('Original path:', branchPath);
+      
+      // Check if the folder exists first
+      const folderExists = await checkFileExists(normalizedPath);
+      if (!folderExists) {
+        throw new Error(`Branch folder not found at: ${normalizedPath}`);
+      }
+      
+      await window.electronAPI.shell.openFolder(normalizedPath);
+      console.log('Folder opened successfully');
+    } catch (error) {
+      console.error('Failed to open folder:', error);
+      setError(`Failed to open folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const handleDeleteBranch = async (branchInfo: BranchInfo) => {
@@ -188,7 +221,7 @@ const ManagedEnvironment: React.FC = () => {
     const branchData = {
       branchName: branchInfo.name,
       steamBranchKey: branchInfo.steamBranchKey,
-      folderName: branchInfo.path.split('/').pop() || branchInfo.name.toLowerCase().replace(' ', '-'),
+      folderName: branchInfo.path.split('\\').pop() || branchInfo.name.toLowerCase().replace(' ', '-'),
       steamLibraryPath: config.steamLibraryPath,
       managedEnvironmentPath: config.managedEnvironmentPath,
       gameInstallPath: config.gameInstallPath,
@@ -484,7 +517,7 @@ const ManagedEnvironment: React.FC = () => {
                           </button>
                         </div>
                         <button
-                          onClick={() => handleLaunchBranch(branch.name)}
+                          onClick={() => handlePlayBranch(branch)}
                           className="w-full py-2 px-4 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors flex items-center justify-center space-x-2"
                         >
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -540,7 +573,7 @@ const ManagedEnvironment: React.FC = () => {
         onStartInstallation={handleStartDefaultModsInstallation}
         branches={branches.map(branch => ({
           name: branch.name,
-          folderName: branch.path.split('/').pop() || branch.name.toLowerCase().replace(' ', '-'),
+          folderName: branch.path.split('\\').pop() || branch.name.toLowerCase().replace(' ', '-'),
           isInstalled: branch.isInstalled,
           compilationType: branch.name === 'Main' || branch.name === 'Beta' ? 'Il2Cpp' : 'Mono'
         }))}
