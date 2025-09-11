@@ -9,12 +9,13 @@
  * - GitHub API integration for release checking
  * - Semantic version comparison
  * - Release note formatting and cleanup
- * - Update caching with 24-hour validity
+ * - Update caching with 1-hour validity for latest release info
+ * - Always fresh current version detection (never cached)
  * - Support for pre-release versions
  * - Fallback version detection from package.json
  * 
  * @author Schedule I Developer Environment Utility Team
- * @version 2.0.0
+ * @version 2.0.3
  */
 
 import { app } from 'electron';
@@ -206,17 +207,32 @@ export class UpdateService {
 
   /**
    * Check if there's an update available (with caching)
+   * 
+   * Always gets the current version fresh from the application, but caches
+   * the latest release information for up to 1 hour to reduce API calls.
    */
   async checkForUpdates(): Promise<UpdateInfo> {
+    // Always get current version fresh - never cache this
     const currentVersion = this.getCurrentVersion();
     this.loggingService.info(`Checking for updates. Current version: ${currentVersion}`);
 
-    // Check if we have valid cached data
+    // Check if we have valid cached data for latest release info
     if (this.cacheService.isCacheValid()) {
-      this.loggingService.info('Using cached update info');
+      this.loggingService.info('Using cached latest release info');
       const cachedData = this.cacheService.loadCachedUpdateInfo();
       if (cachedData) {
-        return cachedData.updateInfo;
+        // Always use fresh current version, but cached latest version
+        const comparison = this.compareVersions(currentVersion, cachedData.updateInfo.latestVersion);
+        const hasUpdate = comparison < 0;
+
+        this.loggingService.info(`Version comparison (cached): ${currentVersion} vs ${cachedData.updateInfo.latestVersion} (${comparison < 0 ? 'update available' : 'up to date'})`);
+
+        return {
+          hasUpdate,
+          currentVersion, // Always fresh
+          latestVersion: cachedData.updateInfo.latestVersion,
+          release: hasUpdate ? cachedData.release : undefined
+        };
       }
     }
 
@@ -254,12 +270,12 @@ export class UpdateService {
 
     const updateInfo: UpdateInfo = {
       hasUpdate,
-      currentVersion,
+      currentVersion, // Always fresh
       latestVersion: latestVersion,
       release: hasUpdate ? latestRelease : undefined
     };
 
-    // Cache the result
+    // Cache the latest release info (but not current version)
     this.cacheService.saveUpdateInfo(updateInfo, latestRelease);
 
     return updateInfo;

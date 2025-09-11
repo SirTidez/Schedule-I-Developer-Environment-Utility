@@ -2,6 +2,102 @@
 
 All notable changes to the Schedule I Developer Environment Utility are documented in this file.
 
+## [2.0.3] - 2025-01-10
+
+### 🔧 **PATCH RELEASE: Update System Improvements & Package Organization**
+
+This patch release focuses on improving the update checking system, optimizing package organization, and enhancing the overall user experience with better update management.
+
+---
+
+## ✨ **New Features**
+
+### **🔄 Enhanced Update System**
+- **Fresh Version Display**: Current app version is now always displayed fresh (never cached)
+- **Optimized Caching**: Latest release information cached for 1 hour instead of 24 hours
+- **Manual Update Checks**: Users can trigger update checks via the refresh/sync button
+- **Improved Performance**: Balanced approach between freshness and API efficiency
+
+### **📁 Package Organization**
+- **Version-Specific Directories**: New `dist-v2.0.3/` directory for v2.0.3 packages
+- **Legacy Preservation**: Maintains `dist-v2/` directory for v2.0.0 packages
+- **Clean Separation**: Clear organization between different version releases
+
+---
+
+## 🔧 **Improvements**
+
+### **Update Management**
+- **Current Version**: Always fetched fresh from application (never cached)
+- **Cache Duration**: Reduced from 24 hours to 1 hour for latest release info
+- **Update Triggers**: App launch and manual refresh button click
+- **User Control**: Manual update checking via refresh button in managed environment
+
+### **Package Structure**
+- **New Directory**: `dist-v2.0.3/` for version 2.0.3 packages
+- **Legacy Support**: `dist-v2/` preserved for v2.0.0 packages
+- **Future-Proof**: Easy to add new version directories as needed
+
+### **Documentation**
+- **Comprehensive Updates**: All modified files now have detailed documentation
+- **Method Summaries**: JSDoc-style comments for all public methods
+- **Interface Documentation**: Complete documentation for all TypeScript interfaces
+- **Version Tracking**: Updated version numbers across all source files
+
+---
+
+## 🐛 **Bug Fixes**
+
+### **Update System**
+- **Version Accuracy**: Fixed issue where cached current version could be outdated
+- **Cache Efficiency**: Optimized caching strategy for better performance
+- **User Experience**: Improved update checking frequency and control
+
+---
+
+## 📋 **Technical Changes**
+
+### **Files Modified**
+- **UpdateService.ts**: Enhanced update checking logic with fresh version detection
+- **UpdateCacheService.ts**: Reduced cache duration and added comprehensive documentation
+- **ManagedEnvironment.tsx**: Added update checking to refresh button functionality
+- **package.json**: Updated output directory to `dist-v2.0.3`
+- **CHANGELOG.md**: Updated directory structure documentation
+
+### **New Directories**
+- **dist-v2.0.3/**: New package directory for v2.0.3 releases
+
+### **Documentation Updates**
+- **11 source files**: Updated with comprehensive method documentation
+- **Memory file**: Added detailed change log for all improvements
+- **Version consistency**: All files now reference version 2.0.3
+
+---
+
+## 🚀 **Migration Notes**
+
+### **For Users**
+- **No Breaking Changes**: All existing functionality remains the same
+- **Improved Updates**: Better update checking and version display
+- **Manual Control**: New ability to check for updates via refresh button
+
+### **For Developers**
+- **Package Directory**: New builds will go to `dist-v2.0.3/` directory
+- **Legacy Support**: Old packages remain in `dist-v2/` directory
+- **Documentation**: Comprehensive documentation added to all modified files
+
+---
+
+## 📊 **Version Information**
+
+- **Version**: 2.0.3
+- **Release Date**: 2025-01-10
+- **Type**: Patch Release
+- **Compatibility**: Full backward compatibility with v2.0.0
+- **Package Directory**: `dist-v2.0.3/`
+
+---
+
 ## [2.0.0] - 2025-01-10
 
 ### 🚀 **MAJOR RELEASE: Complete Migration to Electron**
@@ -127,7 +223,8 @@ Schedule I Developer Environment Utility/
 │   ├── preload/                  # Preload scripts
 │   └── shared/                   # Shared types
 ├── dist/                         # Built application
-├── dist-v2/                      # Packaged executables
+├── dist-v2.0.3/                  # Packaged executables (v2.0.3)
+├── dist-v2/                      # Packaged executables (legacy v2.0.0)
 ├── assets/                        # Application assets
 ├── CSharp/                       # Legacy C# project (archived)
 ├── package.json                   # Node.js configuration
@@ -144,8 +241,8 @@ Schedule I Developer Environment Utility/
 ## 🚀 **Installation & Distribution**
 
 ### **New Distribution Methods**
-- **Portable Executable**: `Schedule I Developer Environment 2.0.0.exe`
-- **NSIS Installer**: `Schedule I Developer Environment Setup 2.0.0.exe`
+- **Portable Executable**: `Schedule I Developer Environment 2.0.3.exe`
+- **NSIS Installer**: `Schedule I Developer Environment Setup 2.0.3.exe`
 - **Digital Signing**: All executables are digitally signed
 - **Auto-updates**: Built-in update checking system
 

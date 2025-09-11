@@ -1,25 +1,67 @@
+/**
+ * Update Cache Service for Schedule I Developer Environment Utility
+ * 
+ * Handles caching of update information to reduce GitHub API calls and improve
+ * performance. Caches latest release information for 1 hour to balance between
+ * freshness and API rate limiting.
+ * 
+ * Key features:
+ * - 1-hour cache validity for latest release info
+ * - JSON file-based caching
+ * - Error handling and logging
+ * - Cache validation and cleanup
+ * - Current version is never cached (always fresh)
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.0.3
+ */
+
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import { LoggingService } from './LoggingService';
 import { UpdateInfo, GitHubRelease } from './UpdateService';
 
+/**
+ * Interface representing cached update information
+ * 
+ * Contains the cached update information along with metadata about
+ * when it was last checked and the associated release data.
+ */
 export interface CachedUpdateInfo {
+  /** The cached update information */
   updateInfo: UpdateInfo;
+  /** ISO timestamp of when the cache was last updated */
   lastChecked: string;
+  /** The GitHub release data associated with the update */
   release: GitHubRelease;
 }
 
+/**
+ * Update Cache Service class for managing update information caching
+ * 
+ * Provides caching functionality for update information to reduce GitHub API calls
+ * while ensuring the current application version is always fresh.
+ */
 export class UpdateCacheService {
+  /** Path to the cache file */
   private readonly cacheFilePath: string;
+  
+  /** Logging service instance */
   private readonly loggingService: LoggingService;
 
+  /**
+   * Initializes the update cache service
+   * 
+   * @param loggingService Logging service instance
+   * @param configDir Configuration directory path
+   */
   constructor(loggingService: LoggingService, configDir: string) {
     this.loggingService = loggingService;
     this.cacheFilePath = path.join(configDir, 'update.json');
   }
 
   /**
-   * Check if cached update info is still valid (less than 24 hours old)
+   * Check if cached update info is still valid (less than 1 hour old)
    */
   isCacheValid(): boolean {
     try {
@@ -35,8 +77,8 @@ export class UpdateCacheService {
 
       this.loggingService.info(`Cache last checked: ${lastChecked.toISOString()}, ${hoursSinceLastCheck.toFixed(1)} hours ago`);
 
-      // Cache is valid if less than 24 hours old
-      return hoursSinceLastCheck < 24;
+      // Cache is valid if less than 1 hour old
+      return hoursSinceLastCheck < 1;
     } catch (error) {
       this.loggingService.error('Error checking cache validity:', error as Error);
       return false;
@@ -44,7 +86,9 @@ export class UpdateCacheService {
   }
 
   /**
-   * Load cached update info
+   * Load cached update info from file
+   * 
+   * @returns CachedUpdateInfo | null The cached data or null if not available
    */
   loadCachedUpdateInfo(): CachedUpdateInfo | null {
     try {
@@ -64,6 +108,12 @@ export class UpdateCacheService {
 
   /**
    * Save update info to cache
+   * 
+   * Saves the latest release information to cache for future use.
+   * Note: Current version is not cached and should always be fresh.
+   * 
+   * @param updateInfo The update information to cache
+   * @param release The GitHub release data to cache
    */
   saveUpdateInfo(updateInfo: UpdateInfo, release: GitHubRelease): void {
     try {
@@ -82,6 +132,8 @@ export class UpdateCacheService {
 
   /**
    * Get the cache file path
+   * 
+   * @returns string Path to the cache file
    */
   getCacheFilePath(): string {
     return this.cacheFilePath;

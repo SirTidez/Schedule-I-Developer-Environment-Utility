@@ -12,7 +12,7 @@
  * - Cross-platform Steam installation detection
  * 
  * @author Schedule I Developer Environment Utility Team
- * @version 2.0.0
+ * @version 2.0.3
  */
 
 import * as fs from 'fs-extra';

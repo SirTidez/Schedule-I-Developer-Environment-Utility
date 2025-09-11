@@ -261,6 +261,16 @@ const ManagedEnvironment: React.FC = () => {
     await loadConfig();
     // Then reload branches with the updated config
     loadBranches();
+    
+    // Also check for updates when refreshing
+    try {
+      const updateResult = await checkForUpdates();
+      if (updateResult.hasUpdate && !hideUpdateUntilNextRelease) {
+        setShowUpdateDialog(true);
+      }
+    } catch (error) {
+      console.error('Failed to check for updates during refresh:', error);
+    }
   };
 
   const handleUpdateDialogClose = () => {

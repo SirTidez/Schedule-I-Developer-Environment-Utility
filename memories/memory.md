@@ -345,3 +345,199 @@ The Electron application now has full functionality matching the original C# app
 ## Status: Phase 3 Complete ✅
 
 The Electron application now has comprehensive documentation throughout the entire codebase. All files, classes, methods, and interfaces are properly documented with JSDoc-style comments, making the codebase highly maintainable and contributor-friendly.
+
+## Version Update: 2.0.3 (2025-01-10) ✅
+
+### Completed Tasks (Version Update)
+
+#### 1. Version Number Updates ✅
+- **package.json**: Updated main version from 2.0.0 to 2.0.3
+- **Package.appxmanifest**: Updated Windows app manifest version from 1.0.0.0 to 2.0.3.0
+- **Source File Headers**: Updated @version annotations in all source files:
+  - src/preload/index.ts
+  - src/main/services/SteamService.ts
+  - src/main/services/LoggingService.ts
+  - src/main/services/UpdateService.ts
+  - src/main/services/ConfigService.ts
+  - src/main/ipc/steamHandlers.ts
+  - src/renderer/App.tsx
+  - src/renderer/hooks/useConfigService.ts
+  - src/renderer/hooks/useFileService.ts
+  - src/renderer/hooks/useSteamService.ts
+  - src/renderer/components/SetupWizard/SetupWizard.tsx
+
+#### 2. Documentation Updates ✅
+- **CHANGELOG.md**: Added new version entry for 2.0.3
+- **Distribution References**: Updated executable names in changelog:
+  - `Schedule I Developer Environment 2.0.3.exe`
+  - `Schedule I Developer Environment Setup 2.0.3.exe`
+
+### Technical Implementation Details
+
+#### Version Consistency
+- All version references updated systematically across the entire codebase
+- Maintained consistency between Electron and WinUI3 components
+- Updated both semantic versioning (2.0.3) and Windows version format (2.0.3.0)
+
+#### Files Modified
+- **Core Configuration**: package.json, Package.appxmanifest
+- **Source Documentation**: 11 source files with @version headers
+- **Project Documentation**: CHANGELOG.md with new version entry
+
+### Benefits Achieved
+
+1. **Version Consistency**: All components now reference the same version number
+2. **Documentation Accuracy**: Changelog and source headers reflect current version
+3. **Build System Ready**: Version updates ready for packaging and distribution
+4. **Maintainability**: Clear version tracking across all project components
+
+## Status: Version 2.0.3 Update Complete ✅
+
+The application version has been successfully updated to 2.0.3 across all components, documentation, and configuration files. The project is ready for building and distribution with the new version number.
+
+## Update System Improvements (2025-01-10) ✅
+
+### Completed Tasks (Update System Improvements)
+
+#### 1. Update Caching Optimization ✅
+- **UpdateCacheService.ts**: Modified cache validity from 24 hours to 1 hour
+  - Reduced cache duration to check for updates more frequently
+  - Updated documentation to reflect 1-hour cache validity
+  - Added comprehensive method documentation
+
+- **UpdateService.ts**: Enhanced update checking logic
+  - Always gets current version fresh (never cached)
+  - Caches only latest release information for 1 hour
+  - Improved version comparison with fresh current version
+  - Updated documentation to reflect new caching strategy
+
+#### 2. Update Check Frequency Adjustment ✅
+- **ManagedEnvironment.tsx**: Added update checking to refresh button
+  - Update checks now trigger when user clicks refresh/sync button
+  - Maintains existing update check on app launch
+  - Provides more frequent update checking without being intrusive
+
+#### 3. Documentation Updates ✅
+- **UpdateService.ts**: Updated key features documentation
+  - Reflects 1-hour cache validity for latest release info
+  - Documents always-fresh current version detection
+  - Updated method documentation for checkForUpdates
+
+- **UpdateCacheService.ts**: Added comprehensive documentation
+  - File-level documentation with new caching strategy
+  - Interface documentation for CachedUpdateInfo
+  - Method documentation for all cache operations
+  - Version updated to 2.0.3
+
+### Technical Implementation Details
+
+#### Caching Strategy Changes
+- **Current Version**: Always fetched fresh from application (never cached)
+- **Latest Release Info**: Cached for 1 hour to reduce API calls
+- **Cache Validation**: Checks if cache is less than 1 hour old
+- **Update Triggers**: App launch and manual refresh button click
+
+#### Benefits Achieved
+1. **Fresh Version Display**: Current app version is always accurate and up-to-date
+2. **Reduced API Calls**: Latest release info cached for 1 hour instead of 24 hours
+3. **Better User Experience**: More frequent update checks without being excessive
+4. **Manual Control**: Users can trigger update checks via refresh button
+5. **Performance**: Balanced approach between freshness and API efficiency
+
+#### Files Modified
+- **src/main/services/UpdateService.ts**: Enhanced update checking logic
+- **src/main/services/UpdateCacheService.ts**: Reduced cache duration and added documentation
+- **src/renderer/components/ManagedEnvironment/ManagedEnvironment.tsx**: Added update check to refresh
+
+## Status: Update System Improvements Complete ✅
+
+The update checking system has been optimized to provide fresh current version information while maintaining efficient caching of latest release data. Users can now trigger update checks manually via the refresh button, and the system checks for updates up to once per hour as requested.
+
+## Package Directory Update for v2.0.3 (2025-01-10) ✅
+
+### Completed Tasks (Package Directory Update)
+
+#### 1. New Package Directory Structure ✅
+- **package.json**: Updated output directory from `dist-v2` to `dist-v2.0.3`
+  - New directory structure for version 2.0.3 packages
+  - Maintains legacy `dist-v2` directory for v2.0.0 packages
+  - Clear version separation for different releases
+
+- **CHANGELOG.md**: Updated directory structure documentation
+  - Added `dist-v2.0.3/` directory reference
+  - Maintained legacy `dist-v2/` directory reference
+  - Clear documentation of version-specific directories
+
+#### 2. Directory Structure Created ✅
+- **dist-v2.0.3/**: New directory created for v2.0.3 packages
+  - Ready for new package builds
+  - Separates v2.0.3 from legacy v2.0.0 packages
+  - Maintains clean version management
+
+### Technical Implementation Details
+
+#### Package Directory Structure
+```
+Schedule I Developer Environment Utility/
+├── dist-v2.0.3/                  # New v2.0.3 packages
+├── dist-v2/                      # Legacy v2.0.0 packages
+├── dist/                         # Built application
+└── src/                          # Source code
+```
+
+#### Benefits Achieved
+1. **Version Separation**: Clear separation between v2.0.0 and v2.0.3 packages
+2. **Clean Organization**: Each version has its own package directory
+3. **Legacy Preservation**: Old packages remain accessible in dist-v2/
+4. **Future-Proof**: Easy to add new version directories as needed
+
+#### Files Modified
+- **package.json**: Updated electron-builder output directory
+- **CHANGELOG.md**: Updated directory structure documentation
+- **dist-v2.0.3/**: New directory created
+
+## Status: Package Directory Update Complete ✅
+
+The package directory has been successfully updated to use `dist-v2.0.3` for version 2.0.3 packages, while maintaining the legacy `dist-v2` directory for v2.0.0 packages. This provides clear version separation and better organization for different releases.
+
+## Changelog Update for v2.0.3 (2025-01-10) ✅
+
+### Completed Tasks (Changelog Update)
+
+#### 1. Comprehensive Changelog Entry ✅
+- **CHANGELOG.md**: Updated with detailed v2.0.3 release information
+  - Complete feature documentation for update system improvements
+  - Package organization changes and new directory structure
+  - Technical changes and files modified
+  - Migration notes for users and developers
+  - Version information and compatibility details
+
+#### 2. Release Documentation Structure ✅
+- **New Features**: Enhanced update system and package organization
+- **Improvements**: Update management, package structure, and documentation
+- **Bug Fixes**: Version accuracy and cache efficiency improvements
+- **Technical Changes**: Detailed list of modified files and new directories
+- **Migration Notes**: User and developer guidance
+- **Version Information**: Complete release metadata
+
+### Technical Implementation Details
+
+#### Changelog Sections Added
+- **Enhanced Update System**: Fresh version display, optimized caching, manual checks
+- **Package Organization**: Version-specific directories and legacy preservation
+- **Update Management**: Fresh current version, 1-hour cache, manual triggers
+- **Documentation**: Comprehensive updates across 11 source files
+- **Bug Fixes**: Version accuracy and cache efficiency improvements
+- **Technical Changes**: Complete file modification list
+- **Migration Notes**: User and developer guidance
+
+#### Benefits Achieved
+1. **Complete Documentation**: All v2.0.3 changes properly documented
+2. **User Guidance**: Clear migration notes and feature explanations
+3. **Developer Reference**: Technical details for future development
+4. **Version Tracking**: Proper release documentation and metadata
+5. **Professional Standards**: Industry-standard changelog format
+
+## Status: Changelog Update Complete ✅
+
+The CHANGELOG.md has been comprehensively updated with detailed v2.0.3 release information, including all new features, improvements, bug fixes, and technical changes. The changelog now provides complete documentation for the v2.0.3 release.
