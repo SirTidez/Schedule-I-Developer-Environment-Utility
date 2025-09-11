@@ -2,6 +2,33 @@
 
 **Version 2.0.3** - Enhanced Update System & Package Organization
 
+## 🎮 What is Schedule I Developer Environment?
+
+The Schedule I Developer Environment Utility is a specialized tool designed for **Schedule I** game developers and modders who need to manage multiple development branches and mod configurations. This application streamlines the complex process of setting up and switching between different game versions, making it easier to develop, test, and maintain mods across various game branches.
+
+### **Core Purpose**
+Schedule I is a complex game with multiple development branches (stable, beta, experimental, etc.), each potentially requiring different mod configurations and file setups. Manually managing these environments is time-consuming and error-prone. This utility automates the entire process, allowing developers to:
+
+- **Quickly switch between game branches** without manual file copying
+- **Maintain separate mod configurations** for each development branch
+- **Automatically detect and manage Steam installations** across different library locations
+- **Track branch updates** and ensure you're always working with the latest versions
+- **Organize development environments** with proper file structure and mod management
+
+### **Who Should Use This Tool**
+- **Game Modders**: Developers creating mods for Schedule I who need to test across multiple game versions
+- **Content Creators**: YouTubers, streamers, and content creators who switch between different game builds
+- **QA Testers**: Quality assurance teams testing mods and content across various game branches
+- **Development Teams**: Teams working on Schedule I projects that require multiple environment setups
+- **Power Users**: Advanced players who want to maintain multiple game configurations
+
+### **Key Benefits**
+- **Time Saving**: Eliminates hours of manual file management and configuration
+- **Error Prevention**: Automated processes reduce human error in environment setup
+- **Organization**: Keeps different game versions and mods properly separated
+- **Efficiency**: Quick switching between development environments
+- **Reliability**: Built-in verification and status checking ensures environments are properly configured
+
 This is the Electron-based version of the Schedule I Developer Environment Utility, converted from the original C# WinUI 3 application. The application provides a modern, cross-platform solution for managing Schedule I development environments with Steam integration and comprehensive branch management.
 
 ## ✨ Features
