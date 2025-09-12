@@ -9,13 +9,19 @@ interface CopyProgressStepProps {
   managedEnvironmentPath: string;
   selectedBranches: string[];
   onComplete: () => void;
+  useSteamCMD?: boolean;
+  steamCMDPath?: string | null;
+  steamCredentials?: { username: string; password: string; stayLoggedIn: boolean } | null;
 }
 
 const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
   steamLibraryPath,
   managedEnvironmentPath,
   selectedBranches,
-  onComplete
+  onComplete,
+  useSteamCMD = false,
+  steamCMDPath = null,
+  steamCredentials = null
 }) => {
   const { copyGameFiles, createDirectory, loading, error, progress } = useFileService();
   const { getBranchBuildId } = useSteamService();
@@ -35,6 +41,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
   const [currentFile, setCurrentFile] = useState<string>('');
   const [filesCopied, setFilesCopied] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
+  const [downloadMethod, setDownloadMethod] = useState<'copy' | 'steamcmd'>('copy');
 
   // Branch display names mapping
   const branchDisplayNames: Record<string, string> = {
@@ -46,9 +53,17 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
 
   useEffect(() => {
     if (steamLibraryPath && managedEnvironmentPath && selectedBranches.length > 0) {
+      // Determine download method
+      if (useSteamCMD && steamCMDPath && steamCredentials) {
+        setDownloadMethod('steamcmd');
+        addTerminalLog('Using SteamCMD for branch downloads');
+      } else {
+        setDownloadMethod('copy');
+        addTerminalLog('Using manual file copying');
+      }
       startCopyProcess();
     }
-  }, [steamLibraryPath, managedEnvironmentPath, selectedBranches]);
+  }, [steamLibraryPath, managedEnvironmentPath, selectedBranches, useSteamCMD, steamCMDPath, steamCredentials]);
 
   useEffect(() => {
     // Set up progress event listener
@@ -167,7 +182,11 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
         if (i === 0) {
           console.log(`Skipping verification for first branch: ${branch}`);
           setCopyStatus('copying');
-          await copyBranchFiles(branch);
+          if (downloadMethod === 'steamcmd') {
+            await downloadBranchWithSteamCMD(branch);
+          } else {
+            await copyBranchFiles(branch);
+          }
         } else {
           setCopyStatus('verifying');
           // Show verification dialog for this branch
@@ -228,16 +247,96 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
     }
   };
 
+  const downloadBranchWithSteamCMD = async (branch: string) => {
+    try {
+      if (!steamCMDPath || !steamCredentials) {
+        throw new Error('SteamCMD path or credentials not available');
+      }
+
+      const branchPath = `${managedEnvironmentPath}/branches/${branch}`;
+      const branchDisplayName = branchDisplayNames[branch] || branch;
+      
+      addTerminalLog(`Starting SteamCMD download for ${branchDisplayName} branch...`);
+      addTerminalLog(`SteamCMD Path: ${steamCMDPath}`);
+      addTerminalLog(`Username: ${steamCredentials.username}`);
+      addTerminalLog(`Destination: ${branchPath}`);
+
+      // Get the Schedule I App ID
+      const appId = await window.electronAPI.steam.getScheduleIAppId();
+      if (!appId) {
+        throw new Error('Could not get Schedule I App ID');
+      }
+
+      addTerminalLog(`App ID: ${appId}`);
+
+      // Map branch names to Steam branch IDs
+      const branchIdMap: Record<string, string> = {
+        'main-branch': 'main',
+        'beta-branch': 'beta',
+        'alternate-branch': 'alternate',
+        'alternate-beta-branch': 'alternate-beta'
+      };
+
+      const branchId = branchIdMap[branch];
+      if (!branchId) {
+        throw new Error(`Unknown branch ID for ${branch}`);
+      }
+
+      addTerminalLog(`Steam Branch ID: ${branchId}`);
+
+      // Download the branch using SteamCMD
+      addTerminalLog(`Executing SteamCMD download command...`);
+      const result = await window.electronAPI.steamcmd.downloadBranch(
+        steamCMDPath,
+        steamCredentials.username,
+        steamCredentials.password,
+        branchPath,
+        branchId,
+        appId
+      );
+
+      if (result.success) {
+        addTerminalLog(`✓ Successfully downloaded ${branchDisplayName} branch with SteamCMD`);
+        addTerminalLog(`Output: ${result.output}`);
+        
+        // Get and save build ID
+        addTerminalLog(`Getting build ID for ${branchDisplayName} branch...`);
+        const buildId = await getBranchBuildId(steamLibraryPath, branch);
+        if (buildId) {
+          addTerminalLog(`Build ID for ${branchDisplayName}: ${buildId}`);
+          await window.electronAPI.config.setBuildIdForBranch(branch, buildId);
+          addTerminalLog(`✓ Saved build ID for ${branchDisplayName} branch`);
+        } else {
+          addTerminalLog(`⚠ Could not get build ID for ${branchDisplayName} branch`);
+        }
+
+        setCompletedBranches(prev => [...prev, branch]);
+      } else {
+        throw new Error(result.error || 'SteamCMD download failed');
+      }
+      
+    } catch (err) {
+      const errorMsg = `Failed to download branch ${branch} with SteamCMD: ${err instanceof Error ? err.message : String(err)}`;
+      console.error(errorMsg);
+      addTerminalLog(`✗ Error: ${errorMsg}`);
+      throw err;
+    }
+  };
+
   const handleBranchVerified = async () => {
     setShowVerificationDialog(false);
     setCopyStatus('copying');
     
     try {
       const branch = selectedBranches[currentBranchIndex];
-      await copyBranchFiles(branch);
+      if (downloadMethod === 'steamcmd') {
+        await downloadBranchWithSteamCMD(branch);
+      } else {
+        await copyBranchFiles(branch);
+      }
       
     } catch (err) {
-      console.error(`Failed to copy branch ${currentBranch}:`, err);
+      console.error(`Failed to process branch ${currentBranch}:`, err);
     } finally {
       if (verificationResolve) {
         verificationResolve();

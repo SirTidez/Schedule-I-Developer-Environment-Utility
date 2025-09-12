@@ -86,7 +86,9 @@ export class ConfigService {
       branchBuildIds: {},
       customLaunchCommands: {},
       lastUpdated: new Date().toISOString(),
-      configVersion: '2.0'
+      configVersion: '2.0',
+      useSteamCMD: false,
+      steamCMDPath: null
     };
   }
   
@@ -184,6 +186,22 @@ export class ConfigService {
     const config = this.getConfig();
     return config.customLaunchCommands[branchName] || '';
   }
+
+  getUseSteamCMD(): boolean {
+    return this.store.get('useSteamCMD', false);
+  }
+
+  setUseSteamCMD(useSteamCMD: boolean): void {
+    this.store.set('useSteamCMD', useSteamCMD);
+  }
+
+  getSteamCMDPath(): string | null {
+    return this.store.get('steamCMDPath', null);
+  }
+
+  setSteamCMDPath(path: string | null): void {
+    this.store.set('steamCMDPath', path);
+  }
   
   validateConfig(): { isValid: boolean; errors: string[]; warnings: string[] } {
     const config = this.getConfig();
@@ -259,7 +277,9 @@ export class ConfigService {
         branchBuildIds: config.branchBuildIds || {},
         customLaunchCommands: config.customLaunchCommands || {},
         lastUpdated: config.lastUpdated || new Date().toISOString(),
-        configVersion: config.configVersion || '2.0'
+        configVersion: config.configVersion || '2.0',
+        useSteamCMD: config.useSteamCMD || false,
+        steamCMDPath: config.steamCMDPath || null
       };
       
       // Load the config into the store

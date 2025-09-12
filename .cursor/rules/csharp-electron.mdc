@@ -1,0 +1,5 @@
+---
+description: C# is deprecated in this project. We are only using the electron project now
+globs:
+alwaysApply: true
+---

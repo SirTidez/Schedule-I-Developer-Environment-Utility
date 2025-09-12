@@ -1,0 +1,5 @@
+---
+description: When building and testing Electron apps, use npm build:main and npm build:renderer each time before testing with npm run dev
+globs:
+alwaysApply: true
+---

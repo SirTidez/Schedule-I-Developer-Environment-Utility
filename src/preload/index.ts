@@ -104,13 +104,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isMaximized: () => ipcRenderer.invoke('window:is-maximized')
   },
   
+  steamcmd: {
+    validateInstallation: (steamCMDPath: string) => ipcRenderer.invoke('steamcmd:validate-installation', steamCMDPath),
+    login: (steamCMDPath: string, username: string, password: string) => ipcRenderer.invoke('steamcmd:login', steamCMDPath, username, password),
+    downloadBranch: (steamCMDPath: string, username: string, password: string, branchPath: string, appId: string, branchId: string) => 
+      ipcRenderer.invoke('steamcmd:download-branch', steamCMDPath, username, password, branchPath, appId, branchId)
+  },
+  
+  steamLogin: {
+    storeCredentials: (credentials: any) => ipcRenderer.invoke('steam-login:store-credentials', credentials),
+    getCredentials: (password: string) => ipcRenderer.invoke('steam-login:get-credentials', password),
+    hasCredentials: () => ipcRenderer.invoke('steam-login:has-credentials'),
+    validateCredentials: (password: string) => ipcRenderer.invoke('steam-login:validate-credentials', password),
+    clearCredentials: () => ipcRenderer.invoke('steam-login:clear-credentials'),
+    updateLastUsed: (password: string) => ipcRenderer.invoke('steam-login:update-last-used', password)
+  },
+  
   // Progress event listeners
   onFileCopyProgress: (callback: (progress: any) => void) => {
     ipcRenderer.on('file-copy-progress', (event, progress) => callback(progress));
   },
   
+  onSteamCMDProgress: (callback: (progress: any) => void) => {
+    ipcRenderer.on('steamcmd-progress', (event, progress) => callback(progress));
+  },
+  
   removeFileCopyProgressListener: () => {
     ipcRenderer.removeAllListeners('file-copy-progress');
+  },
+  
+  removeSteamCMDProgressListener: () => {
+    ipcRenderer.removeAllListeners('steamcmd-progress');
   }
 });
 
@@ -178,8 +202,23 @@ declare global {
         close: () => Promise<void>;
         isMaximized: () => Promise<boolean>;
       };
+      steamcmd: {
+        validateInstallation: (steamCMDPath: string) => Promise<{success: boolean, error?: string}>;
+        login: (steamCMDPath: string, username: string, password: string) => Promise<{success: boolean, error?: string, requiresSteamGuard?: boolean}>;
+        downloadBranch: (steamCMDPath: string, username: string, password: string, branchPath: string, appId: string, branchId: string) => Promise<{success: boolean, error?: string}>;
+      };
+      steamLogin: {
+        storeCredentials: (credentials: any) => Promise<{success: boolean, error?: string}>;
+        getCredentials: (password: string) => Promise<{success: boolean, credentials?: any, error?: string}>;
+        hasCredentials: () => Promise<{exists: boolean, info?: {encryptedAt: string, lastUsed: string}}>;
+        validateCredentials: (password: string) => Promise<{valid: boolean, error?: string}>;
+        clearCredentials: () => Promise<{success: boolean, error?: string}>;
+        updateLastUsed: (password: string) => Promise<{success: boolean, error?: string}>;
+      };
       onFileCopyProgress: (callback: (progress: any) => void) => void;
+      onSteamCMDProgress: (callback: (progress: any) => void) => void;
       removeFileCopyProgressListener: () => void;
+      removeSteamCMDProgressListener: () => void;
     };
   }
 }

@@ -13,6 +13,9 @@ export interface DevEnvironmentConfig {
   customLaunchCommands: Record<string, string>;
   lastUpdated: string; // ISO string format
   configVersion: string;
+  // SteamCMD integration settings
+  useSteamCMD: boolean;
+  steamCMDPath: string | null;
 }
 
 export interface AppManifest {

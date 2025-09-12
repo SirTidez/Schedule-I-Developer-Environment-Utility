@@ -27,10 +27,7 @@ export const setupDialogHandlers = () => {
       ...options
     });
 
-    if (!result.canceled && result.filePaths.length > 0) {
-      return result.filePaths[0];
-    }
-    return null;
+    return result;
   });
 
   // Show save file dialog
@@ -46,5 +43,18 @@ export const setupDialogHandlers = () => {
       return result.filePath;
     }
     return null;
+  });
+
+  // Show open dialog (generic)
+  ipcMain.handle('dialog:showOpenDialog', async (event, options = {}) => {
+    const result = await dialog.showOpenDialog({
+      properties: options.properties || ['openFile'],
+      title: options.title || 'Select File',
+      defaultPath: options.defaultPath || undefined,
+      filters: options.filters || undefined,
+      ...options
+    });
+
+    return result;
   });
 };

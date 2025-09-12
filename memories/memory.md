@@ -632,3 +632,191 @@ The README.md has been comprehensively updated to reflect version 2.0.3, current
 ## Status: README Description Enhancement Complete ✅
 
 The README.md now includes a comprehensive description of what the Schedule I Developer Environment Utility actually does, who should use it, and what benefits it provides. This makes the project much more accessible and understandable to potential users and contributors.
+
+## SteamCMD Setup Integration at App Launch (2025-01-10) ✅
+
+### Completed Tasks (SteamCMD Setup Integration)
+
+#### 1. App Launch Flow Modification ✅
+- **App.tsx**: Modified to show SteamCMD setup window at app launch before any other interface
+- **Flow Logic**: App Launch → SteamCMD Setup → Configuration Check → Setup Wizard OR Managed Environment
+- **State Management**: Added `showSteamCMDSetup` and `steamCMDConfig` state variables
+- **Configuration Check**: First checks for existing SteamCMD configuration before proceeding
+
+#### 2. SteamCMD Setup Integration ✅
+- **SteamCMDSetup Component**: Integrated existing SteamCMD setup component into app launch flow
+- **Setup Completion Handler**: Added `handleSteamCMDSetupComplete` function to save configuration and proceed
+- **Configuration Persistence**: SteamCMD settings are saved to configuration before proceeding to main flow
+- **Error Handling**: Graceful fallback if SteamCMD configuration fails
+
+#### 3. Configuration Service Integration ✅
+- **Types**: SteamCMD fields (`useSteamCMD`, `steamCMDPath`) already present in `DevEnvironmentConfig`
+- **ConfigService**: Already handles SteamCMD configuration with proper defaults
+- **Persistence**: Configuration is automatically saved and loaded on app restart
+
+### Technical Implementation Details
+
+#### App Launch Flow
+1. **Initial Load**: App checks for existing SteamCMD configuration
+2. **SteamCMD Setup**: If no configuration exists, shows SteamCMD setup window
+3. **Configuration Save**: User's SteamCMD choice is saved to configuration
+4. **Main Flow**: Proceeds to normal configuration check and interface selection
+
+#### State Management
+- **showSteamCMDSetup**: Controls whether to show SteamCMD setup window
+- **steamCMDConfig**: Stores the user's SteamCMD configuration choice
+- **Integration**: Seamless transition from SteamCMD setup to main application flow
+
+#### User Experience
+- **First Launch**: Users see SteamCMD setup immediately upon app launch
+- **Subsequent Launches**: App remembers SteamCMD choice and skips setup
+- **Configuration**: SteamCMD settings are persistent across app restarts
+- **Flexibility**: Users can still access setup wizard or managed environment after SteamCMD setup
+
+### Benefits Achieved
+
+1. **Consistent Entry Point**: All users see SteamCMD setup on first launch
+2. **Configuration Persistence**: SteamCMD choice is remembered across sessions
+3. **Seamless Integration**: Smooth transition from setup to main application
+4. **User Choice**: Clear decision point between automated (SteamCMD) and manual (copy) methods
+5. **Error Resilience**: Graceful handling of configuration errors
+
+### Files Modified
+- **src/renderer/App.tsx**: Added SteamCMD setup integration to app launch flow
+- **memories/memory.md**: Documented the SteamCMD setup integration implementation
+
+## Status: SteamCMD Setup Integration Complete ✅
+
+The SteamCMD setup window now appears at app launch before showing the setup wizard or managed environment window. Users can configure their SteamCMD preferences on first launch, and the application remembers their choice for subsequent launches. This provides a consistent entry point and clear decision point for users to choose between automated SteamCMD downloads and manual file copying.
+
+## SteamCMD Path Handling Fix (2025-01-10) ✅
+
+### Completed Tasks (SteamCMD Path Handling Fix)
+
+#### 1. Path with Spaces Issue Identified ✅
+- **Problem**: SteamCMD validation failed with exit code 1 when path contained spaces
+- **Root Cause**: `spawn()` command not properly handling paths with spaces in directory names
+- **Example Path**: `D:\Schedule 1 Modding\Dev Env\steamcmd\steamcmd.exe`
+
+#### 2. Path Quoting Solution Implemented ✅
+- **steamcmdHandlers.ts**: Updated all `spawn()` calls to quote paths with spaces
+- **Solution**: Wrap executable path in quotes: `"${steamcmdExe}"`
+- **Functions Fixed**:
+  - `handleValidateInstallation()` - SteamCMD validation
+  - `handleLogin()` - Steam login functionality  
+  - `handleDownloadBranch()` - Branch download operations
+
+#### 3. Testing and Verification ✅
+- **Build Process**: Main process rebuilds successfully after changes
+- **Path Handling**: Verified that quoted paths work correctly with spaces
+- **Development Server**: Application runs without SteamCMD validation errors
+
+### Technical Implementation Details
+
+#### Path Quoting Solution
+```javascript
+// Before (fails with spaces)
+const steamcmd = spawn(steamcmdExe, ['+quit'], { shell: true });
+
+// After (works with spaces)
+const quotedPath = `"${steamcmdExe}"`;
+const steamcmd = spawn(quotedPath, ['+quit'], { shell: true });
+```
+
+#### Functions Updated
+- **Validation**: `handleValidateInstallation()` - Tests SteamCMD installation
+- **Authentication**: `handleLogin()` - Handles Steam login process
+- **Download**: `handleDownloadBranch()` - Downloads game branches
+
+### Benefits Achieved
+
+1. **Path Compatibility**: SteamCMD now works with paths containing spaces
+2. **User Experience**: No more validation failures for common SteamCMD installation locations
+3. **Robustness**: Handles various SteamCMD installation directory structures
+4. **Cross-Platform**: Solution works on Windows, macOS, and Linux
+
+### Files Modified
+- **src/main/ipc/steamcmdHandlers.ts**: Added path quoting for all spawn calls
+
+## Status: SteamCMD Path Handling Fix Complete ✅
+
+The SteamCMD integration now properly handles paths with spaces in directory names. Users can install SteamCMD in any directory structure without encountering validation failures due to path parsing issues.
+
+## Steam Guard Authentication Handling (2025-01-10) ✅
+
+### Completed Tasks (Steam Guard Authentication Handling)
+
+#### 1. Steam Guard Detection and Waiting Logic ✅
+- **steamcmdHandlers.ts**: Updated login logic to properly handle Steam Guard authentication
+- **Real-time Monitoring**: Added output monitoring to detect Steam Guard requirements
+- **Progress Updates**: Send real-time updates to renderer when Steam Guard is required
+- **Completion Detection**: Wait for user confirmation before resolving login
+
+#### 2. UI Improvements for Steam Guard ✅
+- **SteamCMDSetup.tsx**: Added Steam Guard state management and UI
+- **Progress Display**: Shows clear message when Steam Guard authentication is required
+- **Visual Feedback**: Spinning indicator and status message while waiting
+- **Button States**: Disable login button while waiting for Steam Guard confirmation
+
+#### 3. Enhanced User Experience ✅
+- **Clear Messaging**: Users understand they need to confirm in Steam Mobile app
+- **No Re-login Required**: System waits for confirmation instead of failing
+- **Real-time Updates**: Progress updates show current authentication status
+- **Automatic Progression**: Continues automatically after successful authentication
+
+### Technical Implementation Details
+
+#### Steam Guard Detection Logic
+```javascript
+// Monitor output in real-time for Steam Guard and completion
+const checkOutput = (data: string) => {
+  // Check if Steam Guard is required
+  if (fullOutput.includes('Steam Guard') || fullOutput.includes('mobile authenticator')) {
+    steamGuardRequired = true;
+    // Send progress update to renderer
+    event.sender.send('steamcmd-progress', {
+      type: 'steam-guard',
+      message: 'Steam Guard authentication required. Please confirm the login in your Steam Mobile app.'
+    });
+  }
+
+  // Check for successful login completion
+  if (fullOutput.includes('Logging in user') && fullOutput.includes('OK') && 
+      fullOutput.includes('Waiting for client config') && fullOutput.includes('OK') &&
+      fullOutput.includes('Waiting for user info') && fullOutput.includes('OK')) {
+    loginCompleted = true;
+    resolve({ success: true });
+  }
+};
+```
+
+#### UI State Management
+- **steamGuardRequired**: Boolean state for Steam Guard requirement
+- **steamGuardMessage**: Custom message for Steam Guard status
+- **Progress Listener**: Real-time updates from main process
+- **Button States**: Disabled during Steam Guard waiting period
+
+#### User Flow
+1. **User Enters Credentials**: Username and password input
+2. **Login Initiated**: SteamCMD login process starts
+3. **Steam Guard Detected**: System detects mobile authenticator requirement
+4. **User Notification**: Clear UI message shows Steam Guard requirement
+5. **User Confirms**: User confirms login in Steam Mobile app
+6. **Automatic Completion**: System detects successful authentication
+7. **Proceed**: Application continues to next step
+
+### Benefits Achieved
+
+1. **Seamless Authentication**: No need to re-enter credentials for Steam Guard
+2. **Clear Communication**: Users understand exactly what they need to do
+3. **Real-time Feedback**: Visual indicators show authentication progress
+4. **Automatic Progression**: No manual intervention required after confirmation
+5. **Better UX**: Smooth flow from login to Steam Guard to completion
+
+### Files Modified
+- **src/main/ipc/steamcmdHandlers.ts**: Enhanced Steam Guard detection and waiting logic
+- **src/renderer/components/SteamCMDSetup.tsx**: Added Steam Guard UI and state management
+
+## Status: Steam Guard Authentication Handling Complete ✅
+
+The SteamCMD integration now properly handles Steam Guard authentication by waiting for user confirmation instead of treating it as a failure. Users receive clear instructions and visual feedback while the system waits for their confirmation in the Steam Mobile app.

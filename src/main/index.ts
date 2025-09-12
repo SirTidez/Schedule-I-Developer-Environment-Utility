@@ -18,6 +18,8 @@ import { setupSteamHandlers } from './ipc/steamHandlers';
 import { setupConfigHandlers } from './ipc/configHandlers';
 import { setupFileHandlers } from './ipc/fileHandlers';
 import { setupDialogHandlers } from './ipc/dialogHandlers';
+import { setupSteamCMDHandlers } from './ipc/steamcmdHandlers';
+import { setupSteamLoginHandlers } from './ipc/steamLoginHandlers';
 import { registerUpdateHandlers } from './ipc/updateHandlers';
 import { registerShellHandlers } from './ipc/shellHandlers';
 import { registerWindowHandlers } from './ipc/windowHandlers';
@@ -135,6 +137,8 @@ app.whenReady().then(() => {
   setupConfigHandlers(); // Configuration management
   setupFileHandlers(); // File operations
   setupDialogHandlers(); // Native dialog boxes
+  setupSteamCMDHandlers(); // SteamCMD integration
+  setupSteamLoginHandlers(); // Steam login and authentication
   registerUpdateHandlers(updateService, loggingService); // Update checking
   registerShellHandlers(loggingService); // External URL opening
   registerWindowHandlers(loggingService); // Window management

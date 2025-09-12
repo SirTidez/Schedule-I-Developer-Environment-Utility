@@ -132,17 +132,17 @@ const SetupWizard: React.FC = () => {
         <h1 className="text-3xl font-bold mb-8">Schedule I Development Environment Setup</h1>
         
         {/* Step indicator */}
-        <div className="flex justify-between mb-8">
+        <div className="flex justify-between mb-8 overflow-x-auto">
           {steps.map((step, index) => (
-            <div key={index} className={`flex-1 text-center ${
+            <div key={index} className={`flex-shrink-0 text-center px-2 ${
               index < currentStep ? 'text-blue-400' : 'text-gray-500'
-            }`}>
+            }`} style={{ minWidth: '120px' }}>
               <div className={`w-8 h-8 mx-auto mb-2 rounded-full flex items-center justify-center ${
                 index < currentStep ? 'bg-blue-600' : 'bg-gray-600'
               }`}>
                 {index < currentStep ? '✓' : index + 1}
               </div>
-              <div className="text-sm">{step.title}</div>
+              <div className="text-xs">{step.title}</div>
             </div>
           ))}
         </div>
@@ -154,7 +154,7 @@ const SetupWizard: React.FC = () => {
           {renderCurrentStep()}
           
           {/* Navigation buttons */}
-          {currentStep < 4 && (
+          {currentStep < 6 && (
             <div className="mt-8 flex justify-between">
               <button 
                 className="btn-secondary"

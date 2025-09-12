@@ -24,6 +24,7 @@ import ManagedEnvironment from './components/ManagedEnvironment/ManagedEnvironme
 import CopyProgress from './components/CopyProgress/CopyProgress';
 import DeleteProgress from './components/DeleteProgress/DeleteProgress';
 import DefaultModsProgress from './components/DefaultModsProgress/DefaultModsProgress';
+import SteamCMDSetup from './components/SteamCMDSetup';
 import { CustomTitleBar } from './components/CustomTitleBar/CustomTitleBar';
 import { useConfigValidation } from './hooks/useConfigValidation';
 
@@ -39,12 +40,38 @@ import { useConfigValidation } from './hooks/useConfigValidation';
 const AppContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [shouldShowManagedEnvironment, setShouldShowManagedEnvironment] = useState(false);
+  const [showSteamCMDSetup, setShowSteamCMDSetup] = useState(false);
+  const [steamCMDConfig, setSteamCMDConfig] = useState<{useSteamCMD: boolean, steamCMDPath: string | null} | null>(null);
   const { validation, configExists, validateConfig, checkConfigExists } = useConfigValidation();
   const location = useLocation();
 
   useEffect(() => {
-    const checkConfiguration = async () => {
+    const checkSteamCMDConfiguration = async () => {
       setIsLoading(true);
+      try {
+        // First check if SteamCMD configuration exists
+        const config = await window.electronAPI?.config?.getConfig();
+        if (config && (config.useSteamCMD !== undefined || config.steamCMDPath !== undefined)) {
+          // SteamCMD configuration already exists, proceed to normal flow
+          setSteamCMDConfig({
+            useSteamCMD: config.useSteamCMD || false,
+            steamCMDPath: config.steamCMDPath || null
+          });
+          await checkMainConfiguration();
+        } else {
+          // No SteamCMD configuration, show setup first
+          setShowSteamCMDSetup(true);
+        }
+      } catch (error) {
+        console.error('Error checking SteamCMD configuration:', error);
+        // On error, show SteamCMD setup
+        setShowSteamCMDSetup(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const checkMainConfiguration = async () => {
       try {
         const exists = await checkConfigExists();
         if (exists) {
@@ -59,16 +86,46 @@ const AppContent: React.FC = () => {
       } catch (error) {
         console.error('Error checking configuration:', error);
         // On error, show setup wizard
-      } finally {
-        setIsLoading(false);
       }
     };
 
-    checkConfiguration();
+    checkSteamCMDConfiguration();
   }, []);
 
   // Check if user is forcing setup wizard
   const forceSetupWizard = location.search.includes('setup=true');
+
+  // Handle SteamCMD setup completion
+  const handleSteamCMDSetupComplete = async (useSteamCMD: boolean, steamCMDPath: string | null) => {
+    try {
+      // Save SteamCMD configuration
+      const config = await window.electronAPI?.config?.getConfig() || {};
+      const updatedConfig = {
+        ...config,
+        useSteamCMD,
+        steamCMDPath
+      };
+      await window.electronAPI?.config?.updateConfig(updatedConfig);
+      
+      // Update local state
+      setSteamCMDConfig({ useSteamCMD, steamCMDPath });
+      setShowSteamCMDSetup(false);
+      
+      // Now check main configuration
+      const exists = await checkConfigExists();
+      if (exists) {
+        const validationResult = await validateConfig();
+        if (validationResult.isValid) {
+          setShouldShowManagedEnvironment(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving SteamCMD configuration:', error);
+      // Continue anyway
+      setSteamCMDConfig({ useSteamCMD, steamCMDPath });
+      setShowSteamCMDSetup(false);
+    }
+  };
 
   // Show loading state while checking configuration
   if (isLoading) {
@@ -80,6 +137,18 @@ const AppContent: React.FC = () => {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
             <p className="text-gray-300">Checking configuration...</p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show SteamCMD setup if needed
+  if (showSteamCMDSetup) {
+    return (
+      <div className="h-screen bg-gray-900 text-white flex flex-col overflow-hidden">
+        <CustomTitleBar title="Schedule I Developer Environment - SteamCMD Setup" />
+        <div className="flex-1 overflow-auto">
+          <SteamCMDSetup onSetupComplete={handleSteamCMDSetupComplete} />
         </div>
       </div>
     );
