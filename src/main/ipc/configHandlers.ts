@@ -13,6 +13,24 @@ export function setupConfigHandlers() {
     }
   });
   
+  ipcMain.handle('config:get-config-dir', async () => {
+    try {
+      return configService.getConfigDir();
+    } catch (error) {
+      console.error('Error getting config dir:', error);
+      throw error;
+    }
+  });
+  
+  ipcMain.handle('config:get-logs-dir', async () => {
+    try {
+      return configService.getLogsPath();
+    } catch (error) {
+      console.error('Error getting logs dir:', error);
+      throw error;
+    }
+  });
+  
   ipcMain.handle('config:update', async (event, updates) => {
     try {
       configService.updateConfig(updates);

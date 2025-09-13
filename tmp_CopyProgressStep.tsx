@@ -44,7 +44,6 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
   const [filesCopied, setFilesCopied] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
   const [downloadMethod, setDownloadMethod] = useState<'copy' | 'depotdownloader'>('copy');
-  const [effectiveCreds, setEffectiveCreds] = useState<null | { username: string; password: string; stayLoggedIn: boolean }>(steamCredentials);
   const [branchLogLines, setBranchLogLines] = useState<string[]>([]);
   const [branchLogStart, setBranchLogStart] = useState<Date | null>(null);
   const [sessionLogLines, setSessionLogLines] = useState<string[]>([]);
@@ -66,30 +65,13 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
     'alternate-beta-branch': 'Alternative Beta'
   };
 
-  // Pull cached Steam credentials if not provided
-  useEffect(() => {
-    (async () => {
-      if (!steamCredentials) {
-        try {
-          const res = await window.electronAPI?.credCache?.get?.();
-          if (res?.success && res.credentials) {
-            setEffectiveCreds({ username: res.credentials.username, password: res.credentials.password, stayLoggedIn: false });
-            addTerminalLog('Using cached Steam credentials for DepotDownloader');
-          }
-        } catch {}
-      } else {
-        setEffectiveCreds(steamCredentials);
-      }
-    })();
-  }, [steamCredentials]);
-
   // Ensure we only start once, and only when prerequisites are satisfied
   const startedRef = useRef(false);
   useEffect(() => {
     if (!steamLibraryPath || !managedEnvironmentPath || selectedBranches.length === 0) return;
 
     // If DepotDownloader is desired, wait until we have credentials
-    const readyForDepotDownloader = useDepotDownloader && !!effectiveCreds;
+    const readyForDepotDownloader = useDepotDownloader && !!steamCredentials;
     const shouldStart = useDepotDownloader ? readyForDepotDownloader : true;
     if (!shouldStart) return;
     if (startedRef.current) return;
@@ -99,7 +81,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
     setDownloadMethod(method);
     addTerminalLog(method === 'depotdownloader' ? 'Using DepotDownloader for branch downloads' : 'Using manual file copying');
     startCopyProcess(method);
-  }, [steamLibraryPath, managedEnvironmentPath, selectedBranches, useDepotDownloader, depotDownloaderPath, effectiveCreds]);
+  }, [steamLibraryPath, managedEnvironmentPath, selectedBranches, useDepotDownloader, depotDownloaderPath, steamCredentials]);
 
   useEffect(() => {
     // Set up progress event listener
@@ -149,12 +131,12 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
 
         // Look for explicit percentage in parentheses
         const percentMatch = line.match(/\((\d+(?:\.\d+)?)%\)/);
-        if (percentMatch) { parsedPercent = parseFloat(percentMatch[1]); addTerminalLog(`[Progress:parsed] ${parsedPercent.toFixed(1)}% (paren)`); }
+        if (percentMatch) parsedPercent = parseFloat(percentMatch[1]);
 
         // Fallback: any standalone percentage in the line (e.g., "12.34% path")
         if (parsedPercent == null) {
           const anyPercent = line.match(/\b(\d+(?:\.\d+)?)%\b/);
-          if (anyPercent) { parsedPercent = parseFloat(anyPercent[1]); addTerminalLog(`[Progress:parsed] ${parsedPercent.toFixed(1)}% (fallback)`); }
+          if (anyPercent) parsedPercent = parseFloat(anyPercent[1]);
         }
 
         // Look for depot progress indicators
@@ -163,12 +145,16 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
           if (depotMatch) {
             const current = parseInt(depotMatch[1]);
             const total = parseInt(depotMatch[2]);
-            if (total > 0) { parsedPercent = Math.max(0, Math.min(100, (current / total) * 100)); addTerminalLog(`[Progress:parsed] ${parsedPercent.toFixed(1)}% (depot ${current}/${total})`); }
+            if (total > 0) {
+              parsedPercent = Math.max(0, Math.min(100, (current / total) * 100));
+            }
           }
         }
 
         // Check for completion messages
-        if (/download.*complete|all.*depot.*downloaded/i.test(line) || /total downloaded:/i.test(line)) { parsedPercent = 100; addTerminalLog('[Progress] 100% (completion)'); }
+        if (/download.*complete|all.*depot.*downloaded/i.test(line) || /total downloaded:/i.test(line)) {
+          parsedPercent = 100;
+        }
 
         if (typeof parsedPercent === 'number' && !Number.isNaN(parsedPercent)) {
           const clamped = Math.max(0, Math.min(100, parsedPercent));
@@ -555,7 +541,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
       
       addTerminalLog(`Starting DepotDownloader download for ${branchDisplayName} branch...`);
       addTerminalLog(`DepotDownloader Path: ${depotDownloaderPath || 'PATH/alias'}`);
-      addTerminalLog(`Username: ${effectiveCreds.username}`);
+      addTerminalLog(`Username: ${steamCredentials.username}`);
       addTerminalLog(`Destination: ${branchPath}`);
 
       // Get the Schedule I App ID
@@ -585,8 +571,8 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
       addTerminalLog(`Executing DepotDownloader download command...`);
       const result = await window.electronAPI.depotdownloader.downloadBranch(
         depotDownloaderPath || undefined,
-        effectiveCreds.username,
-        effectiveCreds.password,
+        steamCredentials.username,
+        steamCredentials.password,
         branchPath,
         appId,
         branchId
@@ -598,7 +584,10 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
         
       // Get and save build ID (from DepotDownloader manifest)
       addTerminalLog(`Getting build ID for ${branchDisplayName} branch from manifest...`);
-        const buildResp = await window.electronAPI.depotdownloader.getBranchBuildId(branchPath, appId);
+      const buildResp = await window.electronAPI.depotdownloader.getBranchBuildId(
+        branchPath,
+        appId
+      );
         const buildId = buildResp?.buildId as string | undefined;
         if (buildResp.success && buildId) {
           addTerminalLog(`Build ID for ${branchDisplayName}: ${buildId}`);
@@ -645,8 +634,6 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
             openBranchLog(branch, 'depotdownloader');
             await downloadBranchWithDepotDownloader(branch);
             await writeBranchLog(branch, 'success');
-            // Delay between branches to avoid rate limits
-            await new Promise(res => setTimeout(res, 5000));
           } else {
             openBranchLog(branch, 'copy');
             await copyBranchFiles(branch);
@@ -904,3 +891,4 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
 };
 
 export default CopyProgressStep;
+

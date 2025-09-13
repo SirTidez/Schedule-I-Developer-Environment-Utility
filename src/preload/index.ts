@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     detectInstalledBranch: (libraryPath: string) => ipcRenderer.invoke('steam:detect-installed-branch', libraryPath),
     findScheduleILibrary: () => ipcRenderer.invoke('steam:find-schedule-i-library'),
     getGamesFromLibrary: (libraryPath: string) => ipcRenderer.invoke('steam:get-games-from-library', libraryPath),
+    detectSteamProcess: () => ipcRenderer.invoke('steam:detect-steam-process'),
     verifyBranchInstalled: (libraryPath: string, expectedBranch: string) => ipcRenderer.invoke('steam:verify-branch-installed', libraryPath, expectedBranch),
     waitForBranchChange: (libraryPath: string, expectedBranch: string, maxWaitTime?: number) => ipcRenderer.invoke('steam:wait-for-branch-change', libraryPath, expectedBranch, maxWaitTime),
     getBranchBuildId: (libraryPath: string, branchName: string) => ipcRenderer.invoke('steam:get-branch-build-id', libraryPath, branchName),
@@ -53,6 +54,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     config: {
       get: () => ipcRenderer.invoke('config:get'),
       update: (updates: any) => ipcRenderer.invoke('config:update', updates),
+      getConfigDir: () => ipcRenderer.invoke('config:get-config-dir'),
+      getLogsDir: () => ipcRenderer.invoke('config:get-logs-dir'),
       getManagedPath: () => ipcRenderer.invoke('config:get-managed-path'),
       setManagedPath: (path: string) => ipcRenderer.invoke('config:set-managed-path', path),
       validate: () => ipcRenderer.invoke('config:validate'),
@@ -75,8 +78,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exists: (filePath: string) => ipcRenderer.invoke('file:exists', filePath),
     createDirectory: (dirPath: string) => ipcRenderer.invoke('file:create-directory', dirPath),
     deleteDirectory: (dirPath: string) => ipcRenderer.invoke('file:delete-directory', dirPath),
-    copyDirectory: (sourcePath: string, destinationPath: string) => ipcRenderer.invoke('file:copy-directory', sourcePath, destinationPath)
-  },
+    copyDirectory: (sourcePath: string, destinationPath: string) => ipcRenderer.invoke('file:copy-directory', sourcePath, destinationPath),
+    writeText: (filePath: string, content: string) => ipcRenderer.invoke('file:write-text', filePath, content),
+    listFiles: (dirPath: string) => ipcRenderer.invoke('file:list-files', dirPath),
+    deleteFile: (filePath: string) => ipcRenderer.invoke('file:delete-file', filePath)
+    },
   
   dialog: {
     openDirectory: (options?: any) => ipcRenderer.invoke('dialog:openDirectory', options),
@@ -103,12 +109,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     close: () => ipcRenderer.invoke('window:close'),
     isMaximized: () => ipcRenderer.invoke('window:is-maximized')
   },
+
+  system: {
+    getFreeSpace: (targetPath: string) => ipcRenderer.invoke('system:get-free-space', targetPath)
+  },
   
-  steamcmd: {
-    validateInstallation: (steamCMDPath: string) => ipcRenderer.invoke('steamcmd:validate-installation', steamCMDPath),
-    login: (steamCMDPath: string, username: string, password: string) => ipcRenderer.invoke('steamcmd:login', steamCMDPath, username, password),
-    downloadBranch: (steamCMDPath: string, username: string, password: string, branchPath: string, appId: string, branchId: string) => 
-      ipcRenderer.invoke('steamcmd:download-branch', steamCMDPath, username, password, branchPath, appId, branchId)
+  depotdownloader: {
+    validateInstallation: (depotDownloaderPath?: string) => ipcRenderer.invoke('depotdownloader:validate-installation', depotDownloaderPath),
+    login: (depotDownloaderPath: string | undefined, username: string, password: string, options?: any) => ipcRenderer.invoke('depotdownloader:login', depotDownloaderPath, username, password, options),
+    downloadBranch: (depotDownloaderPath: string | undefined, username: string, password: string, branchPath: string, appId: string, branchId: string) =>
+      ipcRenderer.invoke('depotdownloader:download-branch', depotDownloaderPath, username, password, branchPath, appId, branchId),
+    cancel: () => ipcRenderer.invoke('depotdownloader:cancel'),
+    getBranchBuildId: (branchPath: string, appId: string) =>
+      ipcRenderer.invoke('depotdownloader:get-branch-buildid', branchPath, appId)
   },
   
   steamLogin: {
@@ -119,22 +132,75 @@ contextBridge.exposeInMainWorld('electronAPI', {
     clearCredentials: () => ipcRenderer.invoke('steam-login:clear-credentials'),
     updateLastUsed: (password: string) => ipcRenderer.invoke('steam-login:update-last-used', password)
   },
+
+  steamUpdate: {
+    startMonitoring: () => ipcRenderer.invoke('steam-update:start-monitoring'),
+    stopMonitoring: () => ipcRenderer.invoke('steam-update:stop-monitoring'),
+    checkUpdates: () => ipcRenderer.invoke('steam-update:check-updates'),
+    getStatus: () => ipcRenderer.invoke('steam-update:get-status'),
+    getSettings: () => ipcRenderer.invoke('steam-update:get-settings'),
+    updateSettings: (settings: any) => ipcRenderer.invoke('steam-update:update-settings', settings),
+    getChangenumber: (branchName: string) => ipcRenderer.invoke('steam-update:get-changenumber', branchName),
+    setChangenumber: (branchName: string, changenumber: number) => ipcRenderer.invoke('steam-update:set-changenumber', branchName, changenumber),
+    initialize: () => ipcRenderer.invoke('steam-update:initialize')
+  },
   
   // Progress event listeners
   onFileCopyProgress: (callback: (progress: any) => void) => {
     ipcRenderer.on('file-copy-progress', (event, progress) => callback(progress));
   },
   
-  onSteamCMDProgress: (callback: (progress: any) => void) => {
-    ipcRenderer.on('steamcmd-progress', (event, progress) => callback(progress));
+  onDepotDownloaderProgress: (callback: (progress: any) => void) => {
+    ipcRenderer.on('depotdownloader-progress', (event, progress) => callback(progress));
   },
   
   removeFileCopyProgressListener: () => {
     ipcRenderer.removeAllListeners('file-copy-progress');
   },
   
-  removeSteamCMDProgressListener: () => {
-    ipcRenderer.removeAllListeners('steamcmd-progress');
+  removeDepotDownloaderProgressListener: () => {
+    ipcRenderer.removeAllListeners('depotdownloader-progress');
+  },
+
+  // In-memory credential cache
+  credCache: {
+    set: (creds: { username: string; password: string }) => ipcRenderer.invoke('cred-cache:set', creds),
+    get: () => ipcRenderer.invoke('cred-cache:get'),
+    clear: () => ipcRenderer.invoke('cred-cache:clear')
+  },
+
+  // Steam update event listeners
+  onSteamUpdateConnected: (callback: () => void) => {
+    ipcRenderer.on('steam-update:connected', callback);
+  },
+
+  onSteamUpdateDisconnected: (callback: (data: any) => void) => {
+    ipcRenderer.on('steam-update:disconnected', (event, data) => callback(data));
+  },
+
+  onSteamUpdateAvailable: (callback: (updateInfo: any) => void) => {
+    ipcRenderer.on('steam-update:update-available', (event, updateInfo) => callback(updateInfo));
+  },
+
+  onSteamUpdateChecked: (callback: (updateInfo: any) => void) => {
+    ipcRenderer.on('steam-update:update-checked', (event, updateInfo) => callback(updateInfo));
+  },
+
+  onSteamUpdateError: (callback: (data: any) => void) => {
+    ipcRenderer.on('steam-update:error', (event, data) => callback(data));
+  },
+
+  onSteamOwnershipCached: (callback: () => void) => {
+    ipcRenderer.on('steam-update:ownership-cached', callback);
+  },
+
+  removeSteamUpdateListeners: () => {
+    ipcRenderer.removeAllListeners('steam-update:connected');
+    ipcRenderer.removeAllListeners('steam-update:disconnected');
+    ipcRenderer.removeAllListeners('steam-update:update-available');
+    ipcRenderer.removeAllListeners('steam-update:update-checked');
+    ipcRenderer.removeAllListeners('steam-update:error');
+    ipcRenderer.removeAllListeners('steam-update:ownership-cached');
   }
 });
 
@@ -148,6 +214,7 @@ declare global {
         getLibraries: () => Promise<string[]>;
         getScheduleIAppId: () => Promise<string>;
         detectInstalledBranch: (libraryPath: string) => Promise<string | null>;
+        detectSteamProcess: () => Promise<{ isRunning: boolean; processName: string; pid?: number; error?: string }>;
         findScheduleILibrary: () => Promise<string | null>;
         getGamesFromLibrary: (libraryPath: string) => Promise<any[]>;
         verifyBranchInstalled: (libraryPath: string, expectedBranch: string) => Promise<boolean>;
@@ -159,6 +226,8 @@ declare global {
     config: {
       get: () => Promise<any>;
       update: (updates: any) => Promise<any>;
+      getConfigDir: () => Promise<string>;
+      getLogsDir: () => Promise<string>;
       getManagedPath: () => Promise<string>;
       setManagedPath: (path: string) => Promise<string>;
       validate: () => Promise<{ isValid: boolean; errors: string[]; warnings: string[] }>;
@@ -179,6 +248,9 @@ declare global {
         createDirectory: (dirPath: string) => Promise<any>;
         deleteDirectory: (dirPath: string) => Promise<any>;
         copyDirectory: (sourcePath: string, destinationPath: string) => Promise<any>;
+        writeText: (filePath: string, content: string) => Promise<any>;
+        listFiles: (dirPath: string) => Promise<Array<{ name: string; path: string; mtimeMs: number; isFile: boolean }>>;
+        deleteFile: (filePath: string) => Promise<{ success: boolean }>;
       };
       dialog: {
         openDirectory: (options?: any) => Promise<string | null>;
@@ -202,10 +274,15 @@ declare global {
         close: () => Promise<void>;
         isMaximized: () => Promise<boolean>;
       };
-      steamcmd: {
-        validateInstallation: (steamCMDPath: string) => Promise<{success: boolean, error?: string}>;
-        login: (steamCMDPath: string, username: string, password: string) => Promise<{success: boolean, error?: string, requiresSteamGuard?: boolean}>;
-        downloadBranch: (steamCMDPath: string, username: string, password: string, branchPath: string, appId: string, branchId: string) => Promise<{success: boolean, error?: string}>;
+      system: {
+        getFreeSpace: (targetPath: string) => Promise<{ success: boolean; freeBytes?: number; totalBytes?: number; drive?: string; error?: string }>;
+      };
+      depotdownloader: {
+        validateInstallation: (depotDownloaderPath?: string) => Promise<{success: boolean, error?: string, version?: string}>;
+        login: (depotDownloaderPath: string | undefined, username: string, password: string, options?: any) => Promise<{success: boolean, error?: string, requiresSteamGuard?: boolean, guardType?: 'email' | 'mobile'}>;
+        downloadBranch: (depotDownloaderPath: string | undefined, username: string, password: string, branchPath: string, appId: string, branchId: string) => Promise<{success: boolean, error?: string}>;
+        cancel: () => Promise<{success: boolean, error?: string}>;
+        getBranchBuildId: (branchPath: string, appId: string) => Promise<{success: boolean, buildId?: string, error?: string}>;
       };
       steamLogin: {
         storeCredentials: (credentials: any) => Promise<{success: boolean, error?: string}>;
@@ -215,10 +292,33 @@ declare global {
         clearCredentials: () => Promise<{success: boolean, error?: string}>;
         updateLastUsed: (password: string) => Promise<{success: boolean, error?: string}>;
       };
+      steamUpdate: {
+        startMonitoring: () => Promise<{success: boolean, error?: string}>;
+        stopMonitoring: () => Promise<{success: boolean, error?: string}>;
+        checkUpdates: () => Promise<{success: boolean, updateInfo?: any, error?: string}>;
+        getStatus: () => Promise<{success: boolean, status?: {connected: boolean, initialized: boolean}, error?: string}>;
+        getSettings: () => Promise<{success: boolean, settings?: any, error?: string}>;
+        updateSettings: (settings: any) => Promise<{success: boolean, settings?: any, error?: string}>;
+        getChangenumber: (branchName: string) => Promise<{success: boolean, changenumber?: number, error?: string}>;
+        setChangenumber: (branchName: string, changenumber: number) => Promise<{success: boolean, error?: string}>;
+        initialize: () => Promise<{success: boolean, error?: string}>;
+      };
       onFileCopyProgress: (callback: (progress: any) => void) => void;
-      onSteamCMDProgress: (callback: (progress: any) => void) => void;
+      onDepotDownloaderProgress: (callback: (progress: any) => void) => void;
       removeFileCopyProgressListener: () => void;
-      removeSteamCMDProgressListener: () => void;
+      removeDepotDownloaderProgressListener: () => void;
+      onSteamUpdateConnected: (callback: () => void) => void;
+      onSteamUpdateDisconnected: (callback: (data: any) => void) => void;
+      onSteamUpdateAvailable: (callback: (updateInfo: any) => void) => void;
+      onSteamUpdateChecked: (callback: (updateInfo: any) => void) => void;
+      onSteamUpdateError: (callback: (data: any) => void) => void;
+      onSteamOwnershipCached: (callback: () => void) => void;
+      removeSteamUpdateListeners: () => void;
+      credCache: {
+        set: (creds: { username: string; password: string }) => Promise<{ success: boolean; error?: string }>;
+        get: () => Promise<{ success: boolean; credentials?: { username: string; password: string } | null }>;
+        clear: () => Promise<{ success: boolean }>;
+      };
     };
   }
 }

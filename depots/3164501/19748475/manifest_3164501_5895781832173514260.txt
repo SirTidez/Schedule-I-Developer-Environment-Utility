@@ -1,0 +1,257 @@
+Content Manifest for Depot 3164501 
+
+Manifest ID / date     : 5895781832173514260 / 08/27/2025 01:47:40 
+Total number of files  : 247 
+Total number of chunks : 7472 
+Total bytes on disk    : 7678628970 
+Total bytes compressed : 2090575440 
+
+
+          Size Chunks File SHA                                 Flags Name
+        417984      1 2ef5bd22c439ba3d9fd22597983bd063ddc4290f     0 baselib.dll
+      67934720     65 b0b36fb76e661349ac3f4971f8d5f224ae52305e     0 GameAssembly.dll
+        666624      1 d06031fe04939a33dcdaf8776d2688ea3e2251d1     0 Schedule I.exe
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data
+            15      1 45915fa4328fe0b786445a4764b4a0e0ab4e874b     0 Schedule I_Data\app.info
+           164      1 fb57458f63e1d6bf97b47654658ce522818573a2     0 Schedule I_Data\boot.config
+       5525588      6 0efc23ab5568e404bc8b45fb868f668e5a9a5a68     0 Schedule I_Data\globalgamemanagers
+      69356068     70 8ee7bd08c1cac5c646d420868da7fd9c0421ca22     0 Schedule I_Data\globalgamemanagers.assets
+      52364464     51 5af5aeb09b08b16bd80c47dc1a3ff1edab8c7b57     0 Schedule I_Data\globalgamemanagers.assets.resS
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\il2cpp_data
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\il2cpp_data\Metadata
+      18188260     18 7ec32cca5c221c56ae2190ab90a48648c5932cfd     0 Schedule I_Data\il2cpp_data\Metadata\global-metadata.dat
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\il2cpp_data\Resources
+        337563      1 11a1c0e2ab2f8c06fe4507535ed47e0dd279a60d     0 Schedule I_Data\il2cpp_data\Resources\mscorlib.dll-resources.dat
+           900      1 34bf3f1b87e3d7c6686d2aa1a6cc006fd9c55873     0 Schedule I_Data\il2cpp_data\Resources\Newtonsoft.Json.dll-resources.dat
+         14606      1 57bdfb0874b85db972e4f4b1a68627c4d5ea1cee     0 Schedule I_Data\il2cpp_data\Resources\Ookii.Dialogs.dll-resources.dat
+         93718      1 493c03e9cfef6f72a00f92023cdb88527dfdf72c     0 Schedule I_Data\il2cpp_data\Resources\System.Data.dll-resources.dat
+         25453      1 34d46d957520cb1a525ea9eab36cc40d57a3715a     0 Schedule I_Data\il2cpp_data\Resources\System.Drawing.dll-resources.dat
+        133950      1 effa51ca6b61f9ef4f9a85b420bd4311cb4e4aaa     0 Schedule I_Data\il2cpp_data\Resources\System.Windows.Forms.dll-resources.dat
+       5013420      5 38effea85fd82ff7d2c11561db66bbd237beca2d     0 Schedule I_Data\level0
+     268689616    260 d04cfea6044ee7a66cf46460ef5f241a1cdb698e     0 Schedule I_Data\level1
+      43834588     45 d4daa81406ae3ae29a31a12b3b9e972ec4e5d8c1     0 Schedule I_Data\level2
+         68864      1 1bce96c8a44b000b3125cd8d3d624fc0a333ba99     0 Schedule I_Data\level2.resS
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\Plugins
+           241      1 92e14caa35c40ec341e33cbed56bd8726b6ec016     0 Schedule I_Data\Plugins\Steamworks.NET.txt
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\Plugins\x86_64
+        132608      1 ff154603532a6f16394d745662b4196c8ef086b9     0 Schedule I_Data\Plugins\x86_64\lib_burst_generated.dll
+        300392      1 20e6879434cb715e59eed7d4dd8c2cd749ac10e0     0 Schedule I_Data\Plugins\x86_64\steam_api64.dll
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\Resources
+     182021300    199 27a6a5ed5b8fe32ae08ad62d1b1cf78d29cb1090     0 Schedule I_Data\resources.assets
+     944221216    943 0146ffac99ab47d10804280a6c1197464ea91792     0 Schedule I_Data\resources.assets.resS
+         69248      1 5d05bd05fb1d871e1a96e17e356828db76ce812a     0 Schedule I_Data\resources.resource
+       1564256      2 183384d063327e6e2a336307e988b4ea30386be3     0 Schedule I_Data\Resources\unity default resources
+        365100      1 308cbe1c8a7509d3f5675b6365a4ada23b762ba2     0 Schedule I_Data\Resources\unity_builtin_extra
+          8738      1 78feea49be9776615ced25d522a8bb94859307c4     0 Schedule I_Data\RuntimeInitializeOnLoads.json
+          5266      1 a8a920735fae18d56dea8104bc294562ca6e5403     0 Schedule I_Data\ScriptingAssemblies.json
+     173523180    177 decbcd0d4ee0480caab46d3cb6de05386c74a405     0 Schedule I_Data\sharedassets0.assets
+    2626598752   2736 3c28b5fda061cb2d5e003155f04a4377c4bfb84b     0 Schedule I_Data\sharedassets0.assets.resS
+     350158794    356 59db50ac7b85b2d055d7dc5c6df772d8baff531d     0 Schedule I_Data\sharedassets0.resource
+     173579612    171 671fe70d6bfa7b9a58f7bcc28e466e1ca5bac759     0 Schedule I_Data\sharedassets1.assets
+    2148843648   2135 5887fe540fc37fec53954918aea1a548aeafa7fd     0 Schedule I_Data\sharedassets1.assets.resS
+      54173440     58 e3824316774ea5c52752c380fee7d3a06977985c     0 Schedule I_Data\sharedassets1.resource
+      71249120     71 2febf9d4032be5d35836dcaf8e31a82f92a208bc     0 Schedule I_Data\sharedassets2.assets
+     375469168    361 0d6ac0b01e8b4f6e5d63f6cf7831d64b92633d38     0 Schedule I_Data\sharedassets2.assets.resS
+      10935680     12 dbacfd832aba61789de3744bc888b4c5f39b8451     0 Schedule I_Data\sharedassets2.resource
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Car Wash
+           230      1 e68e51e5fcdc849c395dfc5f7130037b0db2a5b1     0 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Car Wash\Business.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Car Wash\Objects
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Car Wash\Objects\launderingstation_9e5c54
+           488      1 719c948041eb99ed86ae2608861b8c765447499b     0 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Car Wash\Objects\launderingstation_9e5c54\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Car Wash\Objects\smallstoragerack_2cd9f9
+          1012      1 31039f420503db4602b67bad8ae447a49fa60d15     0 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Car Wash\Objects\smallstoragerack_2cd9f9\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Laundromat
+           233      1 3308eff06f9f8875f0f0d71876ee9beff7b7473e     0 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Laundromat\Business.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Laundromat\Objects
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Laundromat\Objects\launderingstation_8ffd1d
+           489      1 88c39668ecc484d9e98bdbc3cb8f95631a81268b     0 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Laundromat\Objects\launderingstation_8ffd1d\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Laundromat\Objects\mediumstoragerack_c42d84
+          1243      1 54fbf9c79ee41e2a2fe0528405fe7911de80b356     0 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Laundromat\Objects\mediumstoragerack_c42d84\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Post Office
+           233      1 fb10bdd1e42d742ad24ef6d65e0d60519120dc9b     0 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Post Office\Business.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Post Office\Objects
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Post Office\Objects\launderingstation_ad5374
+           488      1 e1b96d0daa84847b5ad868fa03d6910abf650398     0 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Post Office\Objects\launderingstation_ad5374\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Post Office\Objects\mediumstoragerack_c5e2fc
+          1242      1 2e383524e8ee758f6691861d57ee253f80b6a7ab     0 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Post Office\Objects\mediumstoragerack_c5e2fc\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Taco Ticklers
+           235      1 5b4376532ee14afe1e6f372a11e1528cddc58667     0 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Taco Ticklers\Business.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Taco Ticklers\Objects
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Taco Ticklers\Objects\filingcabinet_acba06
+           483      1 5e9526e052d8030be86a247695db3983295be733     0 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Taco Ticklers\Objects\filingcabinet_acba06\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Taco Ticklers\Objects\launderingstation_6e6751
+           487      1 f09170c550e3d5c4505b06620f2d3a711bde23c9     0 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Taco Ticklers\Objects\launderingstation_6e6751\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Taco Ticklers\Objects\mediumstoragerack_218e14
+          1241      1 9cda8037c349ce4df8c79adf3044ecb9239e795e     0 Schedule I_Data\StreamingAssets\DefaultSave\Businesses\Taco Ticklers\Objects\mediumstoragerack_218e14\Data.json
+           908      1 752621b8725dca7be8379a4ebed9050e016d46ee     0 Schedule I_Data\StreamingAssets\DefaultSave\Cartel.json
+           118      1 02cc14120aea5b86ea9a840f70a15d81a4d2affa     0 Schedule I_Data\StreamingAssets\DefaultSave\Law.json
+           134      1 80254723288ba5d916fde4ad525808d6287e522d     0 Schedule I_Data\StreamingAssets\DefaultSave\Money.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\NPCs
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Albert Hoover
+           267      1 c0fd3d2dd8f9ddb25a9b0d7962d72db7f36950d4     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Albert Hoover\NPC.json
+           165      1 1573695ad03e85667d21b32d577fc39a39510872     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Albert Hoover\Relationship.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Austin Steiner
+           490      1 1084af8027442c1d5f435d1597e104040e238ef3     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Austin Steiner\CustomerData.json
+           112      1 b58ac6ba6cf3ef30f4d85b6ff61fca049d0c1d44     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Austin Steiner\NPC.json
+           164      1 2aa8afb711c5849227795384bc57678d6801a6c0     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Austin Steiner\Relationship.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Jessi Waters
+           826      1 498c2d3b0dfe593847e38f793ce42f81846f8903     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Jessi Waters\CustomerData.json
+           110      1 f231d37e4012e3136d07da830f9230ffb0030028     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Jessi Waters\NPC.json
+           164      1 2aa8afb711c5849227795384bc57678d6801a6c0     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Jessi Waters\Relationship.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Kathy Henderson
+           855      1 fa39448159b75af4bef9aa88c4a6345632832751     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Kathy Henderson\CustomerData.json
+           113      1 7140de91d90e8dc5435c2c5e2e411f886afb21f5     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Kathy Henderson\NPC.json
+           164      1 2aa8afb711c5849227795384bc57678d6801a6c0     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Kathy Henderson\Relationship.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Kyle Cooley
+           856      1 bd38ae985b40e6e0a0255cda1e806806eb1f5482     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Kyle Cooley\CustomerData.json
+           109      1 cd0f6d7ef1c810f6de8315c4eae2eeb6f1a1f4ab     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Kyle Cooley\NPC.json
+           164      1 2aa8afb711c5849227795384bc57678d6801a6c0     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Kyle Cooley\Relationship.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Mick Lubbin
+           855      1 6c8022de5a6c1c6837012ffc36747e46714260eb     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Mick Lubbin\CustomerData.json
+           109      1 7c80e9c19a9e0856cc8769925acb98021f925060     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Mick Lubbin\NPC.json
+           164      1 2aa8afb711c5849227795384bc57678d6801a6c0     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Mick Lubbin\Relationship.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Sam Thompson
+          1160      1 58f33c98977e6a5e5d7f8e08210b96f63d1b06d2     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Sam Thompson\CustomerData.json
+           110      1 426da7ead121d8bad1539ce407993f3d010fa44b     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Sam Thompson\NPC.json
+           164      1 2aa8afb711c5849227795384bc57678d6801a6c0     0 Schedule I_Data\StreamingAssets\DefaultSave\NPCs\Sam Thompson\Relationship.json
+          1023      1 86f6b14b7ffb7ae3ad5ebc594012e508f9ad42f2     0 Schedule I_Data\StreamingAssets\DefaultSave\Products.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Barn
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Barn\Objects
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Barn\Objects\bed_33ec85
+           998      1 93cdea7a8f9f8c67aab1d22980f868b9bed9a19c     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Barn\Objects\bed_33ec85\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Barn\Objects\mediumstoragerack_e94e7a
+          1244      1 898393d355eeb5b5f5d36dc76511c64889dc038b     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Barn\Objects\mediumstoragerack_e94e7a\Data.json
+           263      1 b833a988f108261844805b386033f87111755d28     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Barn\Property.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Bungalow
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Bungalow\Objects
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Bungalow\Objects\bed_a9422d
+          1000      1 c6d445831475729041ae8aad8df7a0182dff8483     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Bungalow\Objects\bed_a9422d\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Bungalow\Objects\mediumstoragerack_ce609b
+          1244      1 64b34b51d55ebc9351b80e962b1f4461da9f7df0     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Bungalow\Objects\mediumstoragerack_ce609b\Data.json
+           235      1 1aaa838a5a4d752c4a10bea44575a7b8a94d81d8     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Bungalow\Property.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Docks Warehouse
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Docks Warehouse\Objects
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Docks Warehouse\Objects\bed_057e44
+           998      1 1a076792b9429d597f3de250062cb1663142aae8     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Docks Warehouse\Objects\bed_057e44\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Docks Warehouse\Objects\floorlamp_648c8d
+           506      1 fb0db169f462087b1eae936cc279eaa64262f96a     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Docks Warehouse\Objects\floorlamp_648c8d\Data.json
+           273      1 7c1b01997d62b83411e57480b01c084425e4211a     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Docks Warehouse\Property.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Objects
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Objects\bed_030454
+           999      1 94d991fc063a2d6b78305848f94fc71a203b37f2     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Objects\bed_030454\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Objects\floorlamp_471686
+           505      1 e2e74dd4bb7081277385c95db242987028f45115     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Objects\floorlamp_471686\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Objects\mediumstoragerack_cf7deb
+          1243      1 0ab9b8a10ac5d9736d3274cd75c02a8bc056b8a2     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Objects\mediumstoragerack_cf7deb\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Objects\trashcan_738988
+           800      1 77d0c28c7358146eaece383f0f813481bf3a1bd9     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Objects\trashcan_738988\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Objects\TV_c68df9
+           473      1 0ff0ed8d64d770730ad5e69357c778fad8e453ab     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Objects\TV_c68df9\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Objects\wallclock_697310
+           704      1 a0753689832345788f65929aaa29930eb3e05c05     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Objects\wallclock_697310\Data.json
+           190      1 84b0ace20302968fb5670f4f30b4dbc263510fdc     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Motel Room\Property.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\ledgrowlight_6544dc
+          1315      1 48791ea1596d8b82fe1c10f74c6782c4cdf8ad6d     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\ledgrowlight_6544dc\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\ledgrowlight_986486
+          1315      1 3c84fa5473c690bbb19e53f6ac99f33eb83a6c24     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\ledgrowlight_986486\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\mediumstoragerack_3a757d
+          1310      1 d3088d4db8eedc58bc5d9ce3baa16d5adc4496e3     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\mediumstoragerack_3a757d\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\packagingstation_491539
+           913      1 c97c0c5bbdb6627a6bb9f4b0c75a8bc4e05027f3     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\packagingstation_491539\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\plasticpot_46b275
+          1066      1 e31575f2259b7c5454058459423e53d065ad2b0d     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\plasticpot_46b275\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\plasticpot_78ec1f
+           928      1 3f4d0585d6f43d293f7d31d6070cbbeca83885ee     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\plasticpot_78ec1f\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\suspensionrack_011cc5
+           487      1 7d7b20b8795749c93a99276157b798e49478d4a2     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\suspensionrack_011cc5\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\suspensionrack_4b341e
+           487      1 eba89ef2737a3ca844a552de78cc98bffd0b6217     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\suspensionrack_4b341e\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\trashcan_7ba519
+           573      1 452cb6c5ef0c9787a2b06e8b4029ff8dba6b6803     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Objects\trashcan_7ba519\Data.json
+           182      1 43c3493399a8a0572c53b1fb4f0e3bf20f51f547     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\RV\Property.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Sweatshop
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Sweatshop\Objects
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Sweatshop\Objects\bed_fb4c6d
+           997      1 68795946a4aa29a72ea7eb1e926235936aa1df18     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Sweatshop\Objects\bed_fb4c6d\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Sweatshop\Objects\smallstoragerack_1708b5
+          1011      1 5ce277e103d05009aeddaa8c9537a2909792c74b     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Sweatshop\Objects\smallstoragerack_1708b5\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Sweatshop\Objects\trashcan_855ebc
+           570      1 f43ddc4c8c225574b4d0c47f088345be1e82268e     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Sweatshop\Objects\trashcan_855ebc\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Sweatshop\Objects\wallclock_86a014
+           700      1 d99fda21fc7bea0422cbde8b9398c0d0dc66179f     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Sweatshop\Objects\wallclock_86a014\Data.json
+           191      1 d14f84fb6c8f2c1988390b13146c60283f87d8f1     0 Schedule I_Data\StreamingAssets\DefaultSave\Properties\Sweatshop\Property.json
+           150      1 ea57c0563dcadb07080fbec44204f27f08b2fdda     0 Schedule I_Data\StreamingAssets\DefaultSave\Time.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Trash
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Generators
+          2482      1 03dc923c1a8b5e3592dc1ba47ccab05ce92404b4     0 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Generators\Generator_0416ee.json
+           865      1 692849a5987b7611f601ba8d3cb1a5a6d6cc084e     0 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Generators\Generator_047c8c.json
+          8460      1 cf467b997c28d0371b2a7e0fce9165e9e23bf53e     0 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Generators\Generator_138a1c.json
+          3315      1 451346e1884dca1c651278d98a4618d222b1686f     0 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Generators\Generator_1ab16c.json
+          3805      1 f09ff984a6f3c41c85d6f48f3975d5476f2c0ceb     0 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Generators\Generator_276171.json
+          2629      1 41026bacbd3be3ce715d792ed0d0340546c3cd7d     0 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Generators\Generator_6a4ed7.json
+          4589      1 7e4092e112d2007f6b21d918c5099716e4887c79     0 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Generators\Generator_80a654.json
+          3413      1 14fd75e6e12e1ab211bec3578f63d4bc9cc71d66     0 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Generators\Generator_8164cc.json
+          8803      1 0525b8a7372d12a56f66cc008fc2866732cc34e9     0 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Generators\Generator_a3e27b.json
+           865      1 8fe1a7b4977c6d83af00f3ad019680fbbd43dc5a     0 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Generators\Generator_a6426e.json
+          1404      1 f76b151940a58d2c8f8b746029f453dfec36a951     0 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Generators\Generator_d4d7f2.json
+          3266      1 d8713800d898ec62a3fda3e8bfda7534675a3034     0 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Generators\Generator_fbe06e.json
+        621586      1 d5dfb41084acbb67d50433543e5c060d2827024c     0 Schedule I_Data\StreamingAssets\DefaultSave\Trash\Trash.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultSave\WorldStorageEntities
+           821      1 fea27d4b04d641ae815a6a3bbd2656f4f3fea552     0 Schedule I_Data\StreamingAssets\DefaultSave\WorldStorageEntities\Entity_110432.json
+           821      1 16aed471410d279f8cbb55dc49f39d7553ae9dae     0 Schedule I_Data\StreamingAssets\DefaultSave\WorldStorageEntities\Entity_4a1d3e.json
+           820      1 46e0a7b2306d832cafbae5b3e7250bcc248923f7     0 Schedule I_Data\StreamingAssets\DefaultSave\WorldStorageEntities\Entity_b77c6f.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave
+           125      1 4bd66389e867c9a8b504c0cb894cb1d4b7a90d9f     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Game.json
+           656      1 63a697d191a32979a72030873609f98e147bd4db     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Metadata.json
+           135      1 aad9d9acb57f6f0a144883c3e23ebd103e00fc9c     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Money.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Andy
+          1067      1 7e2925d3bbf5c89b781aa46b98ed1e815fbf10d9     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Andy\CustomerData.json
+           518      1 0dc93f9099cb0f68eb0bfe48817108a3a493ede4     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Andy\MessageConversation.json
+           109      1 c8e3646c55f2a8bee278c7a099f286fc1d246d58     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Andy\NPC.json
+           178      1 e1907db5db8ce5364b6108f20e1ebf8ba13e5f99     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Andy\Relationship.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Doug
+          1067      1 99c5c0a2cd7ec1d13cb984c11796f897789768b1     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Doug\CustomerData.json
+           506      1 3c4030910e5edb55734d025156d4a1b7ff04cc66     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Doug\MessageConversation.json
+           109      1 dbc0ca06bc4406f0c0abdb43597d0b197bafc8dd     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Doug\NPC.json
+           178      1 8aaff1a839f32b40bcfe8f92565e7c4151af33a3     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Doug\Relationship.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Joe
+          1087      1 c72f7bf1aa122ef12f4b1af77ff1beb8ea496b63     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Joe\CustomerData.json
+           512      1 8db231178fef594fca9aaae9de5db9f9075229b5     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Joe\MessageConversation.json
+           108      1 98027a223a6ead483ec82af98871645ac73dec1f     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Joe\NPC.json
+           178      1 5ed724c2d729bb8890c4eba9ea2beaa867bf156a     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\NPCs\Joe\Relationship.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Players
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Players\Player_0
+          1205      1 d35aab1fc2b1fb226c2c168716c8cab1d2c3160d     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Players\Player_0\Clothing.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\ledgrowlight_6544dc
+          1311      1 eb0a7a8413332d9bd4a4fd28f1f9157c2e765ac5     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\ledgrowlight_6544dc\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\ledgrowlight_986486
+          1311      1 7b476178ababe75db178759a09cabb02cc687f7a     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\ledgrowlight_986486\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\mediumstoragerack_56d15f
+          1179      1 6aa894d02623fc4015186c948c13c5047541600c     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\mediumstoragerack_56d15f\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\packagingstation_72e96d
+           903      1 3e98ae1264dd79e8d5cc75bc89780c8c9f14324c     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\packagingstation_72e96d\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\plasticpot_46b275
+          1064      1 2e883da60427907da180bd03ed4ff113144e2540     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\plasticpot_46b275\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\plasticpot_78ec1f
+           928      1 d292e045cc340549e364fdc0bee37c09c37d37b0     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\plasticpot_78ec1f\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\suspensionrack_011cc5
+           483      1 b1e9b3e1432a4ad28584f95927dadbb7a6f9d473     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\suspensionrack_011cc5\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\suspensionrack_4b341e
+           483      1 93f27957c6c09337ec46a7e95cf441a210ea6b8d     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\suspensionrack_4b341e\Data.json
+             0      0 0000000000000000000000000000000000000000    40 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\trashcan_7ba519
+           569      1 fac5875d179f19ca1e9ed5f70fb4c6a79190000d     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Objects\trashcan_7ba519\Data.json
+           253      1 b0b937da010fc915a11f0ec4ac41129dec75c602     0 Schedule I_Data\StreamingAssets\DefaultTutorialSave\Properties\RV\Property.json
+          1458      1 06c9d9cbbea6ebaa593dec6e8a520fe8f8671fe6     0 Schedule I_Data\StreamingAssets\UnityServicesProjectConfiguration.json
+       1112768      2 6ba4b9a89a77888f82897c6afc10e72f196b4583     0 UnityCrashHandler64.exe
+      30902976     30 28d276cf5ed90c9de1330eb3ad5d1b071c313379     0 UnityPlayer.dll

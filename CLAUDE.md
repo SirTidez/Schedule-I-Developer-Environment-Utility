@@ -4,68 +4,77 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build and Development Commands
 
-**Build the solution:**
+**Build the application:**
 ```bash
-dotnet build "Schedule I Developer Environment Utility.sln"
+npm run build
 ```
 
-**Run the application:**
+**Run the application in development:**
 ```bash
-dotnet run --project "Schedule I Developer Environment Utility.csproj"
+npm run dev
 ```
 
-**Test the application (packaged):**
+**Run the application (production):**
 ```bash
-dotnet publish -c Release -r win-x64 --self-contained
+npm start
+```
+
+**Package the application:**
+```bash
+npm run package
 ```
 
 ## Architecture Overview
 
-This is a WinUI3 application that manages development environments for the Steam game "Schedule I". It is a complete refactor from the original Windows Forms application to provide a modern, fluent UI experience while maintaining all core functionality.
-
-### Original Project Reference
-The original Windows Forms application is available in the `references/Schedule I Development Environment Manager` directory and serves as the functional specification for this WinUI3 refactor.
+This is an Electron application built with TypeScript and React that manages development environments for the Steam game "Schedule I". The application provides automated branch management, DepotDownloader integration, and comprehensive Steam library detection.
 
 ### Core Architecture Patterns
 
-**WinUI3 + MVVM Pattern**: The application uses WinUI3 with Model-View-ViewModel pattern for clean separation of concerns and data binding.
+**Electron Multi-Process Architecture**: The application uses Electron's standard architecture:
+- **Main Process**: Node.js backend handling system operations and Steam integration
+- **Renderer Process**: React frontend with secure IPC communication
+- **Preload Script**: Secure bridge between main and renderer processes
 
-**Dependency Injection**: Uses Microsoft.Extensions.DependencyInjection throughout the application with services registered in App.xaml.cs.
+**IPC Communication**: All communication between processes uses Electron's IPC system with type-safe interfaces defined in the preload script.
 
-**Multi-Window Application Flow**:
-- `MainWindow` handles initial setup when no managed environment exists
-- `ManagedEnvironmentWindow` serves as the main interface when an environment is configured
-- Windows transition using proper WinUI3 lifecycle patterns
+### Key Components
 
-### Key Components to be Refactored
+**Main Process Services** (`src/main/services/`):
+- `ConfigService`: Manages persistent configuration storage in AppData with DepotDownloader settings
+- `LoggingService`: File-based logging implementation
+- `CredentialService`: Secure Steam credential storage and encryption
+- `UpdateService`: Application update checking and management
 
-**Services Layer** (to be migrated from original):
-- `SteamService`: Handles Steam integration, game detection, branch detection, and manifest parsing
-- `ConfigurationService`: Manages persistent configuration storage in AppData
-- `FileLoggingService`: Custom logging implementation with file-based output
-- `BranchManagementService`: Handles branch switching and management
-- `FileOperationsService`: Manages large file operations with progress tracking
+**IPC Handlers** (`src/main/ipc/`):
+- `steamHandlers.ts`: Steam library detection, manifest parsing, and branch detection
+- `depotdownloaderHandlers.ts`: DepotDownloader integration replacing legacy SteamCMD
+- `configHandlers.ts`: Configuration management operations
+- `fileHandlers.ts`: File operations with progress tracking
+- `steamLoginHandlers.ts`: Steam authentication and credential management
 
-**Models Layer** (to be migrated from original):
-- `DevEnvironmentConfig`: Central configuration model with branch management and build ID tracking
-- `SteamGameInfo`: Represents Steam game metadata and installation details
-- `BranchInfo`: Represents branch information and build details
+**React Components** (`src/renderer/components/`):
+- `SetupWizard/`: Multi-step setup process with DepotDownloader configuration
+- `ManagedEnvironment/`: Main interface for environment management
+- `Settings/`: Configuration and preferences management
+- Progress dialogs and confirmation components
 
-**ViewModels Layer** (new for WinUI3):
-- `MainWindowViewModel`: Handles initial setup logic
-- `ManagedEnvironmentViewModel`: Main environment management logic
-- `BranchManagementViewModel`: Branch operations and data binding
-
-**Views Layer** (WinUI3 XAML):
-- `MainWindow`: Modern setup interface with Steam library selection
-- `ManagedEnvironmentWindow`: Primary interface for managing existing environments
-- User controls for progress tracking, branch switching prompts, etc.
+**Shared Types** (`src/shared/types.ts`):
+- `DevEnvironmentConfig`: Central configuration interface with DepotDownloader integration
+- Steam-related interfaces and branch management types
 
 ### Application State Management
 
 **Configuration Storage**: Uses JSON serialization to AppData (`%LOCALAPPDATA%\TVGS\Schedule I\Developer Env\config\`)
 
 **Branch Management**: Supports four branch types: main-branch, beta-branch, alternate-branch, alternate-beta-branch
+
+**DepotDownloader Integration Features**:
+- Modern Steam depot downloading with simplified command syntax
+- Automatic Steam Guard support with QR codes
+- Parallel downloads with configurable thread counts
+- Better error handling and progress reporting compared to legacy SteamCMD
+- Installation via Windows Package Manager (winget) or manual download
+- Manifest-based build ID extraction for branch verification
 
 **Steam Integration Features**:
 - Automatic Steam library detection with multi-library support
@@ -75,43 +84,54 @@ The original Windows Forms application is available in the `references/Schedule 
 
 ### UI Design Principles
 
-**WinUI3 Fluent Design**: Implements Windows 11 design language with:
-- Mica material backdrop
-- Modern typography scale
-- Consistent spacing and elevation
-- Adaptive layouts for different window sizes
+**Modern Electron Interface**: Dark-themed interface with:
+- Custom title bar with window controls
+- Progress tracking for file operations
+- Multi-step setup wizard
+- Responsive layout design
 
-**Dark/Light Theme**: Automatic theme detection with system preference integration
-
-**Accessibility**: Full accessibility support with proper automation names and keyboard navigation
+**User Experience**: Prioritizes simplicity and automation:
+- Guided setup process with validation
+- Real-time progress feedback
+- Clear error messaging and recovery options
 
 ### Dependencies
 
 **Core Framework**:
-- .NET 8.0 Windows target framework
-- WinUI3 (Microsoft.WindowsAppSDK)
-- Microsoft.Extensions.Logging and DependencyInjection
+- Electron with TypeScript
+- React for the renderer process
+- Node.js backend services
 
-**Migrated Dependencies**:
-- Microsoft.Extensions.Logging for consistent logging
-- Newtonsoft.Json for configuration serialization (consider System.Text.Json migration)
+**Key Dependencies**:
+- `electron`: Application framework
+- `react`: UI library for renderer process
+- Various Node.js packages for Steam integration and file operations
 
 ## Development Notes
 
-**Migration Strategy**:
-- Services layer can be directly ported with minimal changes
-- Models layer requires no changes
-- UI layer is completely rewritten using WinUI3 XAML and MVVM
-- Form-based dialogs become ContentDialog or separate Windows
+**DepotDownloader Migration**:
+- Migrated from legacy SteamCMD to modern DepotDownloader for improved reliability
+- Simplified command syntax: `-app 3164500 -branch beta -username user -password pass -dir path`
+- Better Steam Guard support with QR code authentication
+- Parallel downloads with configurable thread counts
+- Enhanced error handling and progress reporting
 
-**Key Refactor Points**:
-- Replace Windows Forms controls with WinUI3 equivalents
-- Convert form events to MVVM commands and data binding
-- Implement proper async/await patterns for file operations
-- Use WinUI3 progress reporting for long-running operations
+**Key Technical Details**:
+- **Steam App ID**: Schedule I is hardcoded as "3164500"
+- **Branch Mapping**: main-branch → public, beta-branch → beta, etc.
+- **Build ID Extraction**: Uses manifest files instead of SteamCMD's app_info_print
+- **Configuration**: Stored in `%LOCALAPPDATA%\TVGS\Schedule I\Developer Env\config\`
 
-**Steam App ID**: Schedule I is hardcoded as "3164500" in SteamService
+**Architecture Patterns**:
+- IPC handlers in main process for all system operations
+- Type-safe API exposure through preload script
+- React components with progress tracking and validation
+- Secure credential storage with encryption
 
-**Testing**: This WinUI3 app requires visual testing since automated UI testing is complex. Focus on functional testing of services layer and manual UI testing.
+**Testing Strategy**:
+- Manual testing of UI flows and Steam integration
+- Validation of DepotDownloader installation and authentication
+- Progress tracking verification for file operations
+- Configuration persistence testing
 
-**File Operations**: Large file operations (environment copying) must show progress in WinUI3 progress controls with proper cancellation support.
+**File Operations**: Large file operations (environment copying and downloading) show progress with proper cancellation support through Electron IPC communication.

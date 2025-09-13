@@ -23,6 +23,8 @@ import { useNavigate } from 'react-router-dom';
 import LibrarySelectionStep from './steps/LibrarySelectionStep';
 import EnvironmentPathStep from './steps/EnvironmentPathStep';
 import BranchSelectionStep from './steps/BranchSelectionStep';
+import DepotDownloaderIntegrationStep from './steps/SteamCMDIntegrationStep';
+import SteamLoginStep from './steps/SteamLoginStep';
 import CopyProgressStep from './steps/CopyProgressStep';
 import SummaryStep from './steps/SummaryStep';
 
@@ -41,13 +43,18 @@ const SetupWizard: React.FC = () => {
   const [steamLibraryPath, setSteamLibraryPath] = useState('');
   const [managedEnvironmentPath, setManagedEnvironmentPath] = useState('');
   const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
+  const [useDepotDownloader, setUseDepotDownloader] = useState<boolean>(false);
+  const [depotDownloaderPath, setDepotDownloaderPath] = useState<string | null>(null);
+  const [steamCredentials, setSteamCredentials] = useState<{ username: string; password: string; stayLoggedIn: boolean } | null>(null);
   
   const steps = [
-    { component: LibrarySelectionStep, title: 'Select Steam Library' },
-    { component: EnvironmentPathStep, title: 'Choose Environment Path' },
-    { component: BranchSelectionStep, title: 'Select Branches' },
-    { component: CopyProgressStep, title: 'Copying Files' },
-    { component: SummaryStep, title: 'Setup Complete' }
+    { key: 'library', title: 'Select Steam Library' },
+    { key: 'env', title: 'Choose Environment Path' },
+    { key: 'branches', title: 'Select Branches' },
+    { key: 'depotdownloader', title: 'DepotDownloader Integration' },
+    { key: 'login', title: 'Steam Login' },
+    { key: 'copy', title: 'Copying Files' },
+    { key: 'summary', title: 'Setup Complete' }
   ];
 
   const canProceed = () => {
@@ -55,8 +62,10 @@ const SetupWizard: React.FC = () => {
       case 1: return steamLibraryPath.length > 0;
       case 2: return managedEnvironmentPath.length > 0;
       case 3: return selectedBranches.length > 0;
-      case 4: return true; // Copy progress step
-      case 5: return true; // Summary step
+      case 4: return true; // DepotDownloader Integration configurable, not blocking
+      case 5: return true; // Steam Login allows manual next/skip
+      case 6: return true; // Copy progress step
+      case 7: return true; // Summary step
       default: return false;
     }
   };
@@ -78,26 +87,24 @@ const SetupWizard: React.FC = () => {
   };
 
   const renderCurrentStep = () => {
-    const StepComponent = steps[currentStep - 1].component;
-    
     switch (currentStep) {
       case 1:
         return (
-          <StepComponent
+          <LibrarySelectionStep
             onLibrarySelected={setSteamLibraryPath}
             selectedLibrary={steamLibraryPath}
           />
         );
       case 2:
         return (
-          <StepComponent
+          <EnvironmentPathStep
             onPathSelected={setManagedEnvironmentPath}
             selectedPath={managedEnvironmentPath}
           />
         );
       case 3:
         return (
-          <StepComponent
+          <BranchSelectionStep
             steamLibraryPath={steamLibraryPath}
             onBranchesSelected={setSelectedBranches}
             selectedBranches={selectedBranches}
@@ -105,16 +112,37 @@ const SetupWizard: React.FC = () => {
         );
       case 4:
         return (
-          <StepComponent
-            steamLibraryPath={steamLibraryPath}
-            managedEnvironmentPath={managedEnvironmentPath}
-            selectedBranches={selectedBranches}
-            onComplete={() => setCurrentStep(5)}
+          <DepotDownloaderIntegrationStep
+            onDepotDownloaderPathSelected={setDepotDownloaderPath}
+            onUseDepotDownloader={setUseDepotDownloader}
+            selectedDepotDownloaderPath={depotDownloaderPath}
+            useDepotDownloader={useDepotDownloader}
           />
         );
       case 5:
         return (
-          <StepComponent
+          <SteamLoginStep
+            onLoginSuccess={(creds) => setSteamCredentials(creds)}
+            onSkipLogin={() => setSteamCredentials(null)}
+            depotDownloaderPath={depotDownloaderPath}
+            useDepotDownloader={useDepotDownloader}
+          />
+        );
+      case 6:
+        return (
+          <CopyProgressStep
+            steamLibraryPath={steamLibraryPath}
+            managedEnvironmentPath={managedEnvironmentPath}
+            selectedBranches={selectedBranches}
+            onComplete={() => setCurrentStep(7)}
+            useDepotDownloader={useDepotDownloader}
+            depotDownloaderPath={depotDownloaderPath}
+            steamCredentials={steamCredentials}
+          />
+        );
+      case 7:
+        return (
+          <SummaryStep
             steamLibraryPath={steamLibraryPath}
             managedEnvironmentPath={managedEnvironmentPath}
             selectedBranches={selectedBranches}

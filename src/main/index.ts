@@ -18,12 +18,15 @@ import { setupSteamHandlers } from './ipc/steamHandlers';
 import { setupConfigHandlers } from './ipc/configHandlers';
 import { setupFileHandlers } from './ipc/fileHandlers';
 import { setupDialogHandlers } from './ipc/dialogHandlers';
-import { setupSteamCMDHandlers } from './ipc/steamcmdHandlers';
+import { setupDepotDownloaderHandlers } from './ipc/depotdownloaderHandlers';
 import { setupSteamLoginHandlers } from './ipc/steamLoginHandlers';
+import { setupSteamUpdateHandlers } from './ipc/steamUpdateHandlers';
+import { setupSystemHandlers } from './ipc/systemHandlers';
 import { registerUpdateHandlers } from './ipc/updateHandlers';
 import { registerShellHandlers } from './ipc/shellHandlers';
 import { registerWindowHandlers } from './ipc/windowHandlers';
 import { ConfigService } from './services/ConfigService';
+import { setupCredentialCacheHandlers } from './ipc/credentialCacheHandlers';
 import { LoggingService } from './services/LoggingService';
 import { UpdateService } from './services/UpdateService';
 
@@ -137,8 +140,11 @@ app.whenReady().then(() => {
   setupConfigHandlers(); // Configuration management
   setupFileHandlers(); // File operations
   setupDialogHandlers(); // Native dialog boxes
-  setupSteamCMDHandlers(); // SteamCMD integration
+  setupDepotDownloaderHandlers(); // DepotDownloader integration
   setupSteamLoginHandlers(); // Steam login and authentication
+  setupSteamUpdateHandlers(loggingService, configService); // Steam update monitoring
+  setupSystemHandlers(); // System info (disk space, etc.)
+  setupCredentialCacheHandlers(); // In-memory Steam credential cache
   registerUpdateHandlers(updateService, loggingService); // Update checking
   registerShellHandlers(loggingService); // External URL opening
   registerWindowHandlers(loggingService); // Window management

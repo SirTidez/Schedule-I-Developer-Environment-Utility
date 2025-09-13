@@ -5,6 +5,7 @@ import { useFileService } from '../../hooks/useFileService';
 import { useSteamService } from '../../hooks/useSteamService';
 import { useUpdateService } from '../../hooks/useUpdateService';
 import DefaultModsDialog from '../DefaultModsDialog/DefaultModsDialog';
+import SettingsDialog from '../Settings/SettingsDialog';
 import { UpdateDialog } from '../UpdateDialog/UpdateDialog';
 
 interface BranchInfo {
@@ -29,16 +30,33 @@ const ManagedEnvironment: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [installingBranch, setInstallingBranch] = useState<string | null>(null);
   const [showToolsDropdown, setShowToolsDropdown] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showDefaultModsDialog, setShowDefaultModsDialog] = useState(false);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [hideUpdateUntilNextRelease, setHideUpdateUntilNextRelease] = useState(false);
   const [hasCheckedForUpdates, setHasCheckedForUpdates] = useState(false);
+  const [showSteamLogin, setShowSteamLogin] = useState(false);
+  const [loginUser, setLoginUser] = useState('');
+  const [loginPass, setLoginPass] = useState('');
+  const [loginStatus, setLoginStatus] = useState<{ loggingIn: boolean; msg: string; err?: string; guard?: 'email'|'mobile'|null }>({ loggingIn: false, msg: '', guard: null });
+  const [loginGuardCode, setLoginGuardCode] = useState('');
+  const [cachedUser, setCachedUser] = useState<string | null>(null);
 
   useEffect(() => {
     if (config) {
       loadBranches();
     }
   }, [config]);
+
+  // Load cached Steam credentials for display
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await window.electronAPI?.credCache?.get?.();
+        setCachedUser(res?.success && res.credentials ? res.credentials.username : null);
+      } catch {}
+    })();
+  }, []);
 
   // Reload configuration when component mounts (e.g., returning from copy process)
   useEffect(() => {
@@ -167,6 +185,33 @@ const ManagedEnvironment: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to start installation');
       setInstallingBranch(null);
     }
+  };
+
+  // Minimal DepotDownloader login for Managed Environment
+  const doDepotLogin = async (options?: { twoFactorCode?: string; confirmMobile?: boolean }) => {
+    try {
+      setLoginStatus({ loggingIn: true, msg: options?.twoFactorCode ? 'Submitting Steam Guard code...' : (options?.confirmMobile ? 'Waiting for mobile approval...' : 'Logging in...'), guard: null });
+      const res = await window.electronAPI.depotdownloader.login(undefined, loginUser, loginPass, options?.confirmMobile ? { confirmSteamGuard: true } : (options?.twoFactorCode ? { twoFactorCode: options.twoFactorCode } : undefined));
+      if (res.success) {
+        await window.electronAPI.credCache.set({ username: loginUser, password: loginPass });
+        setCachedUser(loginUser);
+        setLoginStatus({ loggingIn: false, msg: 'Login successful!' , guard: null});
+        return;
+      }
+      if ((res as any).requiresSteamGuard) {
+        const gt = (res as any).guardType as ('email'|'mobile'|undefined);
+        setLoginStatus({ loggingIn: false, msg: gt === 'email' ? 'Steam Guard email code required' : 'Steam Guard mobile approval required', guard: gt || null });
+        return;
+      }
+      setLoginStatus({ loggingIn: false, msg: '', err: res.error || 'Login failed', guard: null });
+    } catch (e) {
+      setLoginStatus({ loggingIn: false, msg: '', err: e instanceof Error ? e.message : 'Login failed', guard: null });
+    }
+  };
+
+  const handleLogout = async () => {
+    try { await window.electronAPI?.credCache?.clear?.(); } catch {}
+    setCachedUser(null);
   };
 
   const handlePlayBranch = async (branchInfo: BranchInfo) => {
@@ -387,6 +432,18 @@ const ManagedEnvironment: React.FC = () => {
                     <div className="absolute right-0 mt-2 w-64 bg-gray-800 rounded-lg shadow-xl border border-gray-700 z-50">
                       <div className="py-2">
                         <button
+                          onClick={() => { setShowSettings(true); setShowToolsDropdown(false); }}
+                          className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 transition-colors flex items-center space-x-3"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 4a7.94 7.94 0 00-.15-1.5l2.11-1.65a.5.5 0 00.12-.64l-2-3.46a.5.5 0 00-.6-.22l-2.49 1a7.97 7.97 0 00-1.3-.76l-.38-2.65a.5.5 0 00-.5-.43h-4a.5.5 0 00-.5.43l-.38 2.65c-.45.2-.88.45-1.3.76l-2.49-1a.5.5 0 00-.6.22l-2 3.46a.5.5 0 00.12.64l2.11 1.65c-.06.49-.06 1.01 0 1.5l-2.11 1.65a.5.5 0 00-.12.64l2 3.46a.5.5 0 00.6.22l2.49-1c.42.31.85.56 1.3.76l.38 2.65a.5.5 0 00.5.43h4a.5.5 0 00.5-.43l.38-2.65c.45-.2.88-.45 1.3-.76l2.49 1a.5.5 0 00.6-.22l2-3.46a.5.5 0 00-.12-.64l-2.11-1.65c.06-.49.06-1.01 0-1.5z" />
+                          </svg>
+                          <div>
+                            <div className="font-medium">Settings</div>
+                            <div className="text-sm text-gray-400">Preferences and thresholds</div>
+                          </div>
+                        </button>
+                        <button
                           onClick={handleInstallDefaultMods}
                           className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 transition-colors flex items-center space-x-3"
                         >
@@ -545,8 +602,8 @@ const ManagedEnvironment: React.FC = () => {
         </div>
 
         {/* Configuration Overview - Secondary */}
-        <div className="card">
-          <h2 className="text-xl font-semibold text-white mb-4">Configuration Overview</h2>
+      <div className="card">
+        <h2 className="text-xl font-semibold text-white mb-4">Configuration Overview</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <p className="text-sm text-gray-400 mb-1">Steam Library Path</p>
@@ -576,6 +633,60 @@ const ManagedEnvironment: React.FC = () => {
         </div>
       </div>
 
+      {/* Steam Session */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-semibold text-white">Steam Session</h2>
+        </div>
+        {cachedUser ? (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-300">Logged in as <span className="font-mono">{cachedUser}</span></p>
+            <button className="btn-secondary" onClick={handleLogout}>Log out</button>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">Not logged in</p>
+        )}
+      </div>
+
+      {/* Steam Login (DepotDownloader) */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-white">Steam Login (DepotDownloader)</h2>
+          <button onClick={() => setShowSteamLogin(v => !v)} className="btn-secondary text-sm">{showSteamLogin ? 'Hide' : 'Show'}</button>
+        </div>
+        {showSteamLogin && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm mb-1">Steam Username</label>
+                <input value={loginUser} onChange={e => setLoginUser(e.target.value)} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white" />
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Steam Password</label>
+                <input type="password" value={loginPass} onChange={e => setLoginPass(e.target.value)} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white" />
+              </div>
+            </div>
+            {!loginStatus.guard && (
+              <button className="btn-primary" disabled={loginStatus.loggingIn || !loginUser || !loginPass} onClick={() => doDepotLogin()}> {loginStatus.loggingIn ? 'Logging in...' : 'Login'} </button>
+            )}
+            {loginStatus.guard === 'email' && (
+              <div className="flex items-center space-x-2">
+                <input placeholder="Email code" value={loginGuardCode} onChange={e => setLoginGuardCode(e.target.value)} className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white" />
+                <button className="btn-primary" disabled={loginStatus.loggingIn || !loginGuardCode.trim()} onClick={() => doDepotLogin({ twoFactorCode: loginGuardCode.trim() })}>Submit Code</button>
+              </div>
+            )}
+            {loginStatus.guard === 'mobile' && (
+              <div className="flex items-center space-x-2">
+                <button className="btn-primary" disabled={loginStatus.loggingIn} onClick={() => doDepotLogin({ confirmMobile: true })}>{loginStatus.loggingIn ? 'Confirming...' : 'I Have Approved in Steam Mobile'}</button>
+                <button className="btn-secondary" disabled={loginStatus.loggingIn} onClick={async () => { try { await window.electronAPI.depotdownloader.cancel(); } catch {}; setLoginStatus({ loggingIn: false, msg: '', err: 'Cancelled', guard: null }); }}>Cancel</button>
+              </div>
+            )}
+            {loginStatus.msg && <p className="text-sm text-blue-300">{loginStatus.msg}</p>}
+            {loginStatus.err && <p className="text-sm text-red-300">{loginStatus.err}</p>}
+          </div>
+        )}
+      </div>
+
       {/* Default Mods Dialog */}
       <DefaultModsDialog
         isOpen={showDefaultModsDialog}
@@ -599,6 +710,7 @@ const ManagedEnvironment: React.FC = () => {
           onHideUntilNextRelease={handleHideUpdateUntilNextRelease}
         />
       )}
+      <SettingsDialog isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>
   );
 };

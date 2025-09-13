@@ -18,9 +18,11 @@
 
 import { ipcMain } from 'electron';
 import { SteamService } from '../services/SteamService';
+import { SteamProcessService } from '../services/SteamProcessService';
 
 /** Steam service instance for handling Steam operations */
 const steamService = new SteamService();
+const steamProcessService = new SteamProcessService();
 
 /**
  * Sets up all Steam-related IPC handlers
@@ -135,6 +137,16 @@ export function setupSteamHandlers() {
     } catch (error) {
       console.error('Error detecting current Steam branch key:', error);
       throw error;
+    }
+  });
+
+  // Windows-only: detect if Steam process is running
+  ipcMain.handle('steam:detect-steam-process', async () => {
+    try {
+      return await steamProcessService.detectSteamProcess();
+    } catch (error) {
+      console.error('Error detecting Steam process:', error);
+      return { isRunning: false, processName: 'steam.exe', error: 'Detection failed' };
     }
   });
 }

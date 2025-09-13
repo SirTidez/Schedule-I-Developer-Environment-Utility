@@ -27,7 +27,7 @@ const credentialService = new CredentialService();
  * @param credentials Steam credentials to store
  * @returns Promise<{success: boolean, error?: string}> Storage result
  */
-async function handleStoreCredentials(event: any, credentials: SteamCredentials): Promise<{success: boolean, error?: string}> {
+async function handleStoreCredentials(event: any, credentials: SteamCredentials & { mode?: 'steam-password'|'master-password'; masterPassword?: string }): Promise<{success: boolean, error?: string}> {
   try {
     console.log('Storing Steam credentials for user:', credentials.username);
     
@@ -37,7 +37,7 @@ async function handleStoreCredentials(event: any, credentials: SteamCredentials)
 
     // Add timestamps
     const now = new Date().toISOString();
-    const credentialsWithTimestamps: SteamCredentials = {
+    const credentialsWithTimestamps: SteamCredentials & { mode?: 'steam-password'|'master-password'; masterPassword?: string } = {
       ...credentials,
       encryptedAt: now,
       lastUsed: now
@@ -98,7 +98,7 @@ async function handleGetCredentials(event: any, password: string): Promise<{succ
  * @param event IPC event object
  * @returns Promise<{exists: boolean, info?: {encryptedAt: string, lastUsed: string}}> Check result
  */
-async function handleHasStoredCredentials(event: any): Promise<{exists: boolean, info?: {encryptedAt: string, lastUsed: string}}> {
+async function handleHasStoredCredentials(event: any): Promise<{exists: boolean, info?: {encryptedAt: string, lastUsed: string, mode?: 'steam-password'|'master-password'}}> {
   try {
     console.log('Checking for stored Steam credentials');
     
@@ -106,13 +106,7 @@ async function handleHasStoredCredentials(event: any): Promise<{exists: boolean,
     
     if (info.exists) {
       console.log('Stored credentials found');
-      return { 
-        exists: true, 
-        info: {
-          encryptedAt: info.encryptedAt || '',
-          lastUsed: info.lastUsed || ''
-        }
-      };
+      return { exists: true, info: { encryptedAt: info.encryptedAt || '', lastUsed: info.lastUsed || '', mode: info.mode } };
     } else {
       console.log('No stored credentials found');
       return { exists: false };

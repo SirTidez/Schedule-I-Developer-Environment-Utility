@@ -40,32 +40,32 @@ import { useConfigValidation } from './hooks/useConfigValidation';
 const AppContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [shouldShowManagedEnvironment, setShouldShowManagedEnvironment] = useState(false);
-  const [showSteamCMDSetup, setShowSteamCMDSetup] = useState(false);
-  const [steamCMDConfig, setSteamCMDConfig] = useState<{useSteamCMD: boolean, steamCMDPath: string | null} | null>(null);
+  const [showDepotDownloaderSetup, setShowDepotDownloaderSetup] = useState(false);
+  const [depotDownloaderConfig, setDepotDownloaderConfig] = useState<{useDepotDownloader: boolean, depotDownloaderPath: string | null} | null>(null);
   const { validation, configExists, validateConfig, checkConfigExists } = useConfigValidation();
   const location = useLocation();
 
   useEffect(() => {
-    const checkSteamCMDConfiguration = async () => {
+    const checkDepotDownloaderConfiguration = async () => {
       setIsLoading(true);
       try {
-        // First check if SteamCMD configuration exists
-        const config = await window.electronAPI?.config?.getConfig();
-        if (config && (config.useSteamCMD !== undefined || config.steamCMDPath !== undefined)) {
-          // SteamCMD configuration already exists, proceed to normal flow
-          setSteamCMDConfig({
-            useSteamCMD: config.useSteamCMD || false,
-            steamCMDPath: config.steamCMDPath || null
+        // First check if DepotDownloader configuration exists
+        const config = await window.electronAPI?.config?.get();
+        if (config && (config.useDepotDownloader !== undefined || config.depotDownloaderPath !== undefined)) {
+          // DepotDownloader configuration already exists, proceed to normal flow
+          setDepotDownloaderConfig({
+            useDepotDownloader: config.useDepotDownloader || false,
+            depotDownloaderPath: config.depotDownloaderPath || null
           });
           await checkMainConfiguration();
         } else {
-          // No SteamCMD configuration, show setup first
-          setShowSteamCMDSetup(true);
+          // No DepotDownloader configuration, show setup first
+          setShowDepotDownloaderSetup(true);
         }
       } catch (error) {
-        console.error('Error checking SteamCMD configuration:', error);
-        // On error, show SteamCMD setup
-        setShowSteamCMDSetup(true);
+        console.error('Error checking DepotDownloader configuration:', error);
+        // On error, show DepotDownloader setup
+        setShowDepotDownloaderSetup(true);
       } finally {
         setIsLoading(false);
       }
@@ -89,28 +89,28 @@ const AppContent: React.FC = () => {
       }
     };
 
-    checkSteamCMDConfiguration();
+    checkDepotDownloaderConfiguration();
   }, []);
 
   // Check if user is forcing setup wizard
   const forceSetupWizard = location.search.includes('setup=true');
 
-  // Handle SteamCMD setup completion
-  const handleSteamCMDSetupComplete = async (useSteamCMD: boolean, steamCMDPath: string | null) => {
+  // Handle DepotDownloader setup completion
+  const handleDepotDownloaderSetupComplete = async (useDepotDownloader: boolean, depotDownloaderPath: string | null) => {
     try {
-      // Save SteamCMD configuration
-      const config = await window.electronAPI?.config?.getConfig() || {};
+      // Save DepotDownloader configuration
+      const config = await window.electronAPI?.config?.get() || {};
       const updatedConfig = {
         ...config,
-        useSteamCMD,
-        steamCMDPath
+        useDepotDownloader,
+        depotDownloaderPath
       };
-      await window.electronAPI?.config?.updateConfig(updatedConfig);
-      
+      await window.electronAPI?.config?.update(updatedConfig);
+
       // Update local state
-      setSteamCMDConfig({ useSteamCMD, steamCMDPath });
-      setShowSteamCMDSetup(false);
-      
+      setDepotDownloaderConfig({ useDepotDownloader, depotDownloaderPath });
+      setShowDepotDownloaderSetup(false);
+
       // Now check main configuration
       const exists = await checkConfigExists();
       if (exists) {
@@ -120,10 +120,10 @@ const AppContent: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('Error saving SteamCMD configuration:', error);
+      console.error('Error saving DepotDownloader configuration:', error);
       // Continue anyway
-      setSteamCMDConfig({ useSteamCMD, steamCMDPath });
-      setShowSteamCMDSetup(false);
+      setDepotDownloaderConfig({ useDepotDownloader, depotDownloaderPath });
+      setShowDepotDownloaderSetup(false);
     }
   };
 
@@ -142,13 +142,13 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Show SteamCMD setup if needed
-  if (showSteamCMDSetup) {
+  // Show DepotDownloader setup if needed
+  if (showDepotDownloaderSetup) {
     return (
       <div className="h-screen bg-gray-900 text-white flex flex-col overflow-hidden">
-        <CustomTitleBar title="Schedule I Developer Environment - SteamCMD Setup" />
+        <CustomTitleBar title="Schedule I Developer Environment - DepotDownloader Setup" />
         <div className="flex-1 overflow-auto">
-          <SteamCMDSetup onSetupComplete={handleSteamCMDSetupComplete} />
+          <SteamCMDSetup onSetupComplete={handleDepotDownloaderSetupComplete} />
         </div>
       </div>
     );

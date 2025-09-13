@@ -20,8 +20,8 @@ import React, { useState, useEffect } from 'react';
 interface SteamLoginStepProps {
   onLoginSuccess: (credentials: { username: string; password: string; stayLoggedIn: boolean }) => void;
   onSkipLogin: () => void;
-  steamCMDPath: string | null;
-  useSteamCMD: boolean;
+  depotDownloaderPath: string | null;
+  useDepotDownloader: boolean;
 }
 
 interface SteamProcessStatus {
@@ -42,8 +42,8 @@ interface LoginStatus {
 const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
   onLoginSuccess,
   onSkipLogin,
-  steamCMDPath,
-  useSteamCMD
+  depotDownloaderPath,
+  useDepotDownloader
 }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -57,10 +57,42 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
     progress: ''
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [showStoredPassword, setShowStoredPassword] = useState(false);
+  const [configDir, setConfigDir] = useState<string>('');
+  const [steamGuardType, setSteamGuardType] = useState<'email'|'mobile'|null>(null);
+  const [steamGuardCode, setSteamGuardCode] = useState('');
+
+  // DepotDownloader progress listener for Steam Guard messages
+  useEffect(() => {
+    const onDepotDownloader = (evt: any) => {
+      if (evt?.type === 'steam-guard' && evt.message) {
+        setLoginStatus(prev => ({ ...prev, steamGuardRequired: true, progress: evt.message }));
+        if (typeof evt.guardType === 'string') {
+          setSteamGuardType(evt.guardType === 'email' ? 'email' : 'mobile');
+        } else if (/email/i.test(evt.message)) {
+          setSteamGuardType('email');
+        } else if (/mobile/i.test(evt.message)) {
+          setSteamGuardType('mobile');
+        }
+      }
+    };
+    window.electronAPI.onDepotDownloaderProgress(onDepotDownloader);
+    return () => window.electronAPI.removeDepotDownloaderProgressListener();
+  }, []);
 
   // Check Steam process status on mount
   useEffect(() => {
     checkSteamProcess();
+  }, []);
+
+  // Load config dir for informational text (no async calls in JSX)
+  useEffect(() => {
+    (async () => {
+      try {
+        const dir = await window.electronAPI?.config?.getConfigDir?.();
+        if (dir) setConfigDir(dir);
+      } catch {}
+    })();
   }, []);
 
   const checkSteamProcess = async () => {
@@ -77,6 +109,8 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
     }
   };
 
+  const useStoredCredentials = async () => {};
+
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
       setLoginStatus(prev => ({
@@ -86,20 +120,14 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
       return;
     }
 
-    if (!steamCMDPath) {
-      setLoginStatus(prev => ({
-        ...prev,
-        error: 'SteamCMD path not configured'
-      }));
-      return;
-    }
+    // Path is optional; we will attempt PATH/alias if not provided
 
     setLoginStatus({
       isLoggingIn: true,
       isSuccess: false,
       error: null,
       steamGuardRequired: false,
-      progress: 'Initializing SteamCMD...'
+      progress: 'Initializing DepotDownloader...'
     });
 
     try {
@@ -119,8 +147,8 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
         progress: 'Attempting login...'
       }));
 
-      // Attempt SteamCMD login
-      const result = await window.electronAPI?.steamcmd?.login(steamCMDPath, username, password);
+      // Attempt DepotDownloader login
+      const result = await window.electronAPI?.depotdownloader?.login(depotDownloaderPath || undefined, username, password);
       
       if (result.success) {
         setLoginStatus({
@@ -130,25 +158,21 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
           steamGuardRequired: false,
           progress: 'Login successful!'
         });
-
-        // Store credentials if requested
-        if (stayLoggedIn) {
-          await window.electronAPI?.steamcmd?.storeCredentials({
-            username,
-            password,
-            stayLoggedIn: true
-          });
-        }
+        try { await window.electronAPI?.credCache?.set?.({ username, password }); } catch {}
 
         // Notify parent component
         onLoginSuccess({ username, password, stayLoggedIn });
-      } else if (result.steamGuardRequired) {
+      } else if ((result as any).requiresSteamGuard || (result as any).steamGuardRequired) {
         setLoginStatus(prev => ({
           ...prev,
           isLoggingIn: false,
           steamGuardRequired: true,
-          progress: 'Steam Guard confirmation required'
+          progress: (result as any).guardType === 'email' ? 'Steam Guard email code required' : 'Steam Guard mobile approval required'
         }));
+        try {
+          const gt = (result as any).guardType;
+          if (gt === 'email' || gt === 'mobile') setSteamGuardType(gt);
+        } catch {}
       } else {
         setLoginStatus(prev => ({
           ...prev,
@@ -170,46 +194,65 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
     setLoginStatus(prev => ({
       ...prev,
       isLoggingIn: true,
-      progress: 'Waiting for Steam Guard confirmation...'
+      progress: 'Waiting for Steam Guard mobile approval...'
     }));
 
+    // Periodic status updates while waiting
+    let seconds = 0;
+    const interval = setInterval(() => {
+      seconds += 5;
+      setLoginStatus(prev => ({ ...prev, progress: `Waiting for mobile approval... (${seconds}s)` }));
+    }, 5000);
+
+    // Timeout after 120 seconds
+    const timeout = setTimeout(async () => {
+      clearInterval(interval);
+      try { await window.electronAPI?.depotdownloader?.cancel?.(); } catch {}
+      setLoginStatus(prev => ({ ...prev, isLoggingIn: false, error: 'Timed out waiting for mobile approval. Please approve in Steam Mobile and try again.' }));
+    }, 120000);
+
     try {
-      const result = await window.electronAPI?.steamcmd?.confirmSteamGuard(steamCMDPath!, username, password);
-      
+      const result = await window.electronAPI?.depotdownloader?.login(depotDownloaderPath || undefined, username, password, { confirmSteamGuard: true });
+      clearInterval(interval);
+      clearTimeout(timeout);
       if (result.success) {
-        setLoginStatus({
-          isLoggingIn: false,
-          isSuccess: true,
-          error: null,
-          steamGuardRequired: false,
-          progress: 'Login successful!'
-        });
-
-        // Store credentials if requested
-        if (stayLoggedIn) {
-          await window.electronAPI?.steamcmd?.storeCredentials({
-            username,
-            password,
-            stayLoggedIn: true
-          });
-        }
-
-        // Notify parent component
-        onLoginSuccess({ username, password, stayLoggedIn });
+        setLoginStatus({ isLoggingIn: false, isSuccess: true, error: null, steamGuardRequired: false, progress: 'Login successful!' });
+        try { await window.electronAPI?.credCache?.set?.({ username, password }); } catch {}
+        onLoginSuccess({ username, password, stayLoggedIn: false });
       } else {
-        setLoginStatus(prev => ({
-          ...prev,
-          isLoggingIn: false,
-          error: result.error || 'Steam Guard confirmation failed'
-        }));
+        setLoginStatus(prev => ({ ...prev, isLoggingIn: false, error: result.error || 'Steam Guard confirmation failed' }));
       }
     } catch (error) {
-      console.error('Steam Guard confirmation error:', error);
-      setLoginStatus(prev => ({
-        ...prev,
-        isLoggingIn: false,
-        error: error instanceof Error ? error.message : 'Steam Guard confirmation failed'
-      }));
+      clearInterval(interval);
+      clearTimeout(timeout);
+      setLoginStatus(prev => ({ ...prev, isLoggingIn: false, error: error instanceof Error ? error.message : 'Steam Guard confirmation failed' }));
+    }
+  };
+
+  const handleSteamGuardSubmitCode = async () => {
+    if (!steamGuardCode.trim()) {
+      setLoginStatus(prev => ({ ...prev, error: 'Enter the Steam Guard code from your email' }));
+      return;
+    }
+    setLoginStatus(prev => ({ ...prev, isLoggingIn: true, error: null, progress: 'Submitting Steam Guard code...' }));
+    try {
+      const result = await window.electronAPI?.depotdownloader?.login(
+        depotDownloaderPath || undefined,
+        username,
+        password,
+        { twoFactorCode: steamGuardCode.trim() }
+      );
+      if (result.success) {
+        setLoginStatus({ isLoggingIn: false, isSuccess: true, error: null, steamGuardRequired: false, progress: 'Login successful!' });
+        try { await window.electronAPI?.credCache?.set?.({ username, password }); } catch {}
+        onLoginSuccess({ username, password, stayLoggedIn: false });
+      } else if ((result as any).requiresSteamGuard) {
+        setLoginStatus(prev => ({ ...prev, isLoggingIn: false, steamGuardRequired: true, progress: 'Steam Guard code still required' }));
+      } else {
+        setLoginStatus(prev => ({ ...prev, isLoggingIn: false, error: result.error || 'Login failed' }));
+      }
+    } catch (error) {
+      setLoginStatus(prev => ({ ...prev, isLoggingIn: false, error: error instanceof Error ? error.message : 'Login failed' }));
     }
   };
 
@@ -217,13 +260,13 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
     onSkipLogin();
   };
 
-  // Show skip option if SteamCMD is not enabled or if user wants to skip login
-  if (!useSteamCMD) {
+  // Show skip option if DepotDownloader is not enabled or if user wants to skip login
+  if (!useDepotDownloader) {
     return (
       <div className="space-y-6">
         <div className="text-center">
           <p className="text-gray-300">
-            SteamCMD integration is disabled. You can skip this step and continue with manual file copying.
+            DepotDownloader integration is disabled. You can skip this step and continue with manual file copying.
           </p>
           <button
             onClick={handleSkip}
@@ -241,7 +284,7 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
       <div>
         <h3 className="text-lg font-semibold mb-2">Steam Account Login</h3>
         <p className="text-gray-300 mb-4">
-          Log in to your Steam account to enable automated branch downloading with SteamCMD.
+          Log in to your Steam account to enable automated branch downloading with DepotDownloader.
           Your credentials will be used securely and can be stored locally if you choose.
         </p>
       </div>
@@ -271,6 +314,11 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
           </div>
         </div>
       )}
+
+      
+
+      {/* Stored Credentials (if available) */}
+      {/* Stored credentials UI removed: session-based only */}
 
       {/* Login Form */}
       {!loginStatus.isSuccess && !steamProcess?.isRunning && (
@@ -315,33 +363,7 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
-            <input
-              id="stay-logged-in"
-              type="checkbox"
-              checked={stayLoggedIn}
-              onChange={(e) => setStayLoggedIn(e.target.checked)}
-              className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-              disabled={loginStatus.isLoggingIn}
-            />
-            <label htmlFor="stay-logged-in" className="text-sm text-gray-300">
-              Stay logged in (store credentials securely)
-            </label>
-          </div>
-
-          {/* Data Handling Explanation */}
-          {stayLoggedIn && (
-            <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
-              <h5 className="font-semibold text-blue-300 mb-2">Data Handling Information:</h5>
-              <ul className="text-sm text-blue-200 space-y-1 list-disc list-inside">
-                <li>Your credentials will be encrypted using SHA512 encryption</li>
-                <li>Credentials are stored locally on your computer only</li>
-                <li>We never transmit your credentials over the internet</li>
-                <li>You can clear stored credentials at any time</li>
-                <li>Credentials are stored in: {window.electronAPI?.config?.getConfigDir?.() || 'config directory'}</li>
-              </ul>
-            </div>
-          )}
+          {/* Session-based login only; no stored credentials or stay-logged-in option */}
 
           <div className="flex space-x-3">
             <button
@@ -369,17 +391,32 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
             <div className="text-yellow-400 text-xl">🔐</div>
             <div>
               <h4 className="font-semibold text-yellow-300 mb-2">Steam Guard Authentication Required</h4>
-              <p className="text-yellow-200 text-sm mb-4">
-                Your Steam account is protected by Steam Guard. Please check your Steam Mobile app 
-                and confirm the login request.
-              </p>
-              <button
-                onClick={handleSteamGuardConfirm}
-                disabled={loginStatus.isLoggingIn}
-                className="btn-primary"
-              >
-                {loginStatus.isLoggingIn ? 'Confirming...' : 'I Have Confirmed in Steam Mobile App'}
-              </button>
+              {steamGuardType === 'mobile' ? (
+                <>
+                  <p className="text-yellow-200 text-sm mb-4">Your account requires mobile approval. Approve the login in your Steam Mobile app, then click below.</p>
+                  <button onClick={handleSteamGuardConfirm} disabled={loginStatus.isLoggingIn} className="btn-primary">
+                    {loginStatus.isLoggingIn ? 'Confirming...' : 'I Have Approved in Steam Mobile App'}
+                  </button>
+                  <button
+                    onClick={async () => { try { await window.electronAPI?.depotdownloader?.cancel?.(); } catch {}; setLoginStatus(prev => ({ ...prev, isLoggingIn: false, error: 'Cancelled waiting for mobile approval' })); }}
+                    disabled={loginStatus.isLoggingIn}
+                    className="btn-secondary ml-2"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-yellow-200 text-sm mb-2">Enter the Steam Guard code sent to your email:</p>
+                  <div className="flex space-x-2 mb-3">
+                    <input type="text" value={steamGuardCode} onChange={(e) => setSteamGuardCode(e.target.value)}
+                           className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="Email code" maxLength={10} />
+                    <button onClick={handleSteamGuardSubmitCode} disabled={loginStatus.isLoggingIn} className="btn-primary">Submit Code</button>
+                  </div>
+                </>
+              )}
+              
             </div>
           </div>
         </div>

@@ -97,7 +97,15 @@ export function setupFileHandlers() {
   
   ipcMain.handle('file:copy-manifest', async (event, appId: string, steamPath: string, branchPath: string) => {
     try {
-      const sourcePath = path.join(steamPath, 'steamapps', `appmanifest_${appId}.acf`);
+      // Support either Steam root (expects steamapps under it) or a steamapps path directly
+      let sourcePath = path.join(steamPath, 'steamapps', `appmanifest_${appId}.acf`);
+      if (!await fs.pathExists(sourcePath)) {
+        // Try interpreting steamPath as the steamapps directory
+        const alt = path.join(steamPath, `appmanifest_${appId}.acf`);
+        if (await fs.pathExists(alt)) {
+          sourcePath = alt;
+        }
+      }
       const destPath = path.join(branchPath, `appmanifest_${appId}.acf`);
       
       console.log(`Copying manifest from: ${sourcePath} to: ${destPath}`);
@@ -179,6 +187,43 @@ export function setupFileHandlers() {
       return { success: true };
     } catch (error) {
       console.error(`Failed to copy directory from ${sourcePath} to ${destinationPath}:`, error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('file:write-text', async (event, filePath: string, content: string) => {
+    try {
+      await fs.ensureDir(path.dirname(filePath));
+      await fs.writeFile(filePath, content, { encoding: 'utf-8' });
+      return { success: true };
+    } catch (error) {
+      console.error(`Failed to write text to ${filePath}:`, error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('file:list-files', async (event, dirPath: string) => {
+    try {
+      const entries = await fs.readdir(dirPath);
+      const results = [] as Array<{ name: string; path: string; mtimeMs: number; isFile: boolean }>;
+      for (const name of entries) {
+        const p = path.join(dirPath, name);
+        const stat = await fs.stat(p);
+        results.push({ name, path: p, mtimeMs: stat.mtimeMs, isFile: stat.isFile() });
+      }
+      return results;
+    } catch (error) {
+      console.error(`Failed to list files in ${dirPath}:`, error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('file:delete-file', async (event, filePath: string) => {
+    try {
+      await fs.remove(filePath);
+      return { success: true };
+    } catch (error) {
+      console.error(`Failed to delete file ${filePath}:`, error);
       throw error;
     }
   });

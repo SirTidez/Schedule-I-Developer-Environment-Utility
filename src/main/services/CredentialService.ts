@@ -35,6 +35,7 @@ export interface EncryptedCredentials {
   stayLoggedIn: boolean;
   encryptedAt: string;
   lastUsed: string;
+  mode?: 'steam-password' | 'master-password';
 }
 
 export class CredentialService {
@@ -99,12 +100,36 @@ export class CredentialService {
         iv: cipherIv.toString('base64'),
         stayLoggedIn: credentials.stayLoggedIn,
         encryptedAt: credentials.encryptedAt,
-        lastUsed: credentials.lastUsed
+        lastUsed: credentials.lastUsed,
+        mode: 'steam-password'
       };
     } catch (error) {
       console.error('Error encrypting credentials:', error);
       throw new Error('Failed to encrypt credentials');
     }
+  }
+
+  /** Encrypts username+password using a user-provided master password */
+  async encryptWithMaster(credentials: SteamCredentials, masterPassword: string): Promise<EncryptedCredentials> {
+    const salt = crypto.randomBytes(this.saltLength);
+    const key = crypto.pbkdf2Sync(masterPassword, salt, 100000, this.keyLength, 'sha512');
+    const iv = crypto.randomBytes(this.ivLength);
+    const cipher = crypto.createCipheriv(this.algorithm, key, iv);
+    cipher.setAAD(Buffer.from('schedule-i-dev-env', 'utf8'));
+    const payload = Buffer.from(JSON.stringify({ username: credentials.username, password: credentials.password }), 'utf8');
+    let enc = cipher.update(payload);
+    enc = Buffer.concat([enc, cipher.final()]);
+    const authTag = cipher.getAuthTag();
+    const encryptedData = Buffer.concat([iv, enc, authTag]).toString('base64');
+    return {
+      encryptedData,
+      salt: salt.toString('base64'),
+      iv: iv.toString('base64'),
+      stayLoggedIn: credentials.stayLoggedIn,
+      encryptedAt: credentials.encryptedAt,
+      lastUsed: credentials.lastUsed,
+      mode: 'master-password'
+    };
   }
 
   /**
@@ -143,14 +168,25 @@ export class CredentialService {
       // Decrypt
       let decrypted = decipher.update(encrypted);
       decrypted = Buffer.concat([decrypted, decipher.final()]);
-      
-      return {
-        username: decrypted.toString('utf8'),
-        password: password, // Return the password used for decryption
-        stayLoggedIn: encryptedCredentials.stayLoggedIn,
-        encryptedAt: encryptedCredentials.encryptedAt,
-        lastUsed: encryptedCredentials.lastUsed
-      };
+      const mode = encryptedCredentials.mode || 'steam-password';
+      if (mode === 'master-password') {
+        const obj = JSON.parse(decrypted.toString('utf8')) as { username: string; password: string };
+        return {
+          username: obj.username,
+          password: obj.password,
+          stayLoggedIn: encryptedCredentials.stayLoggedIn,
+          encryptedAt: encryptedCredentials.encryptedAt,
+          lastUsed: encryptedCredentials.lastUsed
+        };
+      } else {
+        return {
+          username: decrypted.toString('utf8'),
+          password: password, // decryption key is the Steam password
+          stayLoggedIn: encryptedCredentials.stayLoggedIn,
+          encryptedAt: encryptedCredentials.encryptedAt,
+          lastUsed: encryptedCredentials.lastUsed
+        };
+      }
     } catch (error) {
       console.error('Error decrypting credentials:', error);
       throw new Error('Failed to decrypt credentials - invalid password or corrupted data');
@@ -163,9 +199,12 @@ export class CredentialService {
    * @param credentials Steam credentials to store
    * @returns Promise<boolean> True if successful
    */
-  async storeCredentials(credentials: SteamCredentials): Promise<boolean> {
+  async storeCredentials(credentials: SteamCredentials & { mode?: 'steam-password' | 'master-password'; masterPassword?: string }): Promise<boolean> {
     try {
-      const encrypted = await this.encryptCredentials(credentials);
+      const mode = credentials.mode || 'steam-password';
+      const encrypted = mode === 'master-password' && credentials.masterPassword
+        ? await this.encryptWithMaster(credentials, credentials.masterPassword)
+        : await this.encryptCredentials(credentials);
       const data = JSON.stringify(encrypted, null, 2);
       
       await fs.writeFile(this.credentialsPath, data, { encoding: 'utf8' });
@@ -272,7 +311,7 @@ export class CredentialService {
    * 
    * @returns Promise<{ exists: boolean; encryptedAt?: string; lastUsed?: string }> Credential info
    */
-  async getCredentialInfo(): Promise<{ exists: boolean; encryptedAt?: string; lastUsed?: string }> {
+  async getCredentialInfo(): Promise<{ exists: boolean; encryptedAt?: string; lastUsed?: string; mode?: 'steam-password'|'master-password' }> {
     try {
       if (!await fs.pathExists(this.credentialsPath)) {
         return { exists: false };
@@ -284,7 +323,8 @@ export class CredentialService {
       return {
         exists: true,
         encryptedAt: encryptedCredentials.encryptedAt,
-        lastUsed: encryptedCredentials.lastUsed
+        lastUsed: encryptedCredentials.lastUsed,
+        mode: encryptedCredentials.mode || 'steam-password'
       };
     } catch (error) {
       console.error('Error getting credential info:', error);

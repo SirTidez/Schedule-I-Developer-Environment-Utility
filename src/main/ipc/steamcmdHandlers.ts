@@ -16,7 +16,7 @@
  */
 
 import { ipcMain } from 'electron';
-import { spawn } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import { SteamProcessService } from '../services/SteamProcessService';
@@ -24,6 +24,9 @@ import { CredentialService } from '../services/CredentialService';
 
 const steamProcessService = new SteamProcessService();
 const credentialService = new CredentialService();
+
+// Track current SteamCMD download process for cancellation
+let currentDownloadProc: ChildProcess | null = null;
 
 /**
  * Validates SteamCMD installation at the specified path
@@ -64,10 +67,10 @@ async function handleValidateInstallation(event: any, steamCMDPath: string): Pro
 
     // Test SteamCMD by running it with +quit
     return new Promise((resolve) => {
-      // Quote the path to handle spaces correctly
-      const quotedPath = `"${steamcmdExe}"`;
-      const steamcmd = spawn(quotedPath, ['+quit'], {
-        shell: true,
+      // Spawn directly without shell so stdout/stderr stream reliably
+      const steamcmd = spawn(steamcmdExe, ['+quit'], {
+        shell: false,
+        windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe']
       });
 
@@ -164,10 +167,14 @@ async function handleLogin(event: any, steamCMDPath: string, username: string, p
 
     // Attempt login
     return new Promise((resolve) => {
-      // Quote the path to handle spaces correctly
-      const quotedPath = `"${steamcmdExe}"`;
-      const steamcmd = spawn(quotedPath, ['+login', username, password, '+quit'], {
-        shell: true,
+      // Spawn directly without shell so stdout/stderr stream reliably
+      const steamcmd = spawn(steamcmdExe, [
+        '+@ShutdownOnFailedCommand', '1',
+        '+@NoPromptForPassword', '1',
+        '+login', username, password, '+quit'
+      ], {
+        shell: false,
+        windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe']
       });
 
@@ -303,118 +310,209 @@ async function handleLogin(event: any, steamCMDPath: string, username: string, p
 async function handleDownloadBranch(event: any, steamCMDPath: string, username: string, password: string, branchPath: string, appId: string, branchId: string): Promise<{success: boolean, error?: string}> {
   try {
     console.log('Downloading branch:', branchId, 'to:', branchPath);
-    
-    // Check if Steam is running
-    const steamProcess = await steamProcessService.detectSteamProcess();
-    if (steamProcess.isRunning) {
-      return { 
-        success: false, 
-        error: 'Steam is currently running. Please close Steam before downloading.' 
-      };
-    }
 
     if (!steamCMDPath || !username || !password || !branchPath || !appId || !branchId) {
       return { success: false, error: 'All parameters are required for branch download' };
     }
 
-    // Ensure branch directory exists
+    // Ensure branch directory exists and normalize path for Windows
     await fs.ensureDir(branchPath);
+    const installDir = path.resolve(branchPath);
 
     // Determine steamcmd.exe path
     const stat = await fs.stat(steamCMDPath);
-    let steamcmdExe: string;
-    
-    if (stat.isDirectory()) {
-      steamcmdExe = path.join(steamCMDPath, 'steamcmd.exe');
-    } else {
-      steamcmdExe = steamCMDPath;
-    }
-
+    const steamcmdExe = stat.isDirectory() ? path.join(steamCMDPath, 'steamcmd.exe') : steamCMDPath;
     if (!await fs.pathExists(steamcmdExe)) {
       return { success: false, error: 'steamcmd.exe not found' };
     }
 
-    // Download branch
-    return new Promise((resolve) => {
-      // Quote the path to handle spaces correctly
-      const quotedPath = `"${steamcmdExe}"`;
-      const steamcmd = spawn(quotedPath, [
-        '+force_install_dir', branchPath,
+    // Build SteamCMD arguments factory
+    const isPublic = (branchId?.toLowerCase() === 'public' || branchId?.toLowerCase() === 'main');
+    const buildArgs = (): string[] => {
+      const args: string[] = [
+        '+@ShutdownOnFailedCommand', '1',
+        '+@NoPromptForPassword', '1',
+        // Login first to establish session
         '+login', username, password,
-        '+app_update', appId, '-beta', branchId,
-        '+quit'
-      ], {
-        shell: true,
-        stdio: ['ignore', 'pipe', 'pipe']
-      });
+        // Then set install dir
+        '+force_install_dir', installDir,
+      ];
+
+      // Build +app_update argument. For beta branches, SteamCMD expects the
+      // appid and -beta switch in the same token after +app_update.
+      if (isPublic) {
+        args.push('+app_update', `${appId} validate`);
+      } else {
+        args.push('+app_update', `${appId} -beta ${branchId} validate`);
+      }
+
+      // Finally quit
+      args.push('+quit');
+      return args;
+    };
+
+    // Retry policy: up to 2 retries for Steam-running conflicts and login-type failures
+    const maxAttempts = 3; // 1 initial + 2 retries
+    const backoffs = [0, 5000, 15000];
+
+    const wait = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+    // Preflight: if Steam is running, attempt backoff-based retries
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const steamProcess = await steamProcessService.detectSteamProcess();
+      if (!steamProcess.isRunning) break;
+      const waitMs = backoffs[Math.min(attempt, backoffs.length - 1)];
+      const msg = `Steam is running; retrying in ${Math.round(waitMs/1000)}s...`;
+      console.log(msg);
+      event?.sender?.send('steamcmd-progress', { type: 'info', message: msg });
+      await wait(waitMs);
+      if (attempt === maxAttempts - 1) {
+        return { success: false, error: 'Steam is currently running. Please close Steam before downloading.' };
+      }
+    }
+
+    // We'll spawn without shell and pass the path directly
+
+    const attemptOnce = () => new Promise<{success: boolean, error?: string, output?: string}>((resolve) => {
+      const args = buildArgs();
+      const printable = [steamcmdExe, ...args.map(a => (a.includes(' ') ? `"${a}"` : a))].join(' ');
+      console.log('Launching SteamCMD:', printable);
+      const steamcmd = spawn(steamcmdExe, args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      try { event?.sender?.send('steamcmd-progress', { type: 'info', message: `Launching: ${printable}` }); } catch {}
+      currentDownloadProc = steamcmd;
 
       let output = '';
       let errorOutput = '';
+
+      // Progress parsing and buffered emission to avoid IPC overload
+      const parsePercent = (text: string): number | null => {
+        try {
+          const line = text;
+          // 1) explicit percent, e.g., "36.30%"
+          const pm = line.match(/\b([0-9]{1,3}(?:\.[0-9]+)?)%\b/);
+          if (pm) return Math.max(0, Math.min(100, parseFloat(pm[1])));
+          // 2) progress: N or progress: 0.N
+          const m1 = line.match(/progress:\s*([0-9]+(?:\.[0-9]+)?)/i);
+          if (m1) {
+            const v = parseFloat(m1[1]);
+            if (!Number.isNaN(v)) return v <= 1 ? v * 100 : v;
+          }
+          // 3) bytes count pattern "(cur / total)"
+          const m3 = line.match(/\((\d+)\s*\/\s*(\d+)\)/);
+          if (m3) {
+            const cur = parseFloat(m3[1]);
+            const total = parseFloat(m3[2]);
+            if (total > 0) return Math.max(0, Math.min(100, (cur / total) * 100));
+          }
+          // 4) Success marker
+          if (/Success!\s*App\s*'\d+'\s*fully installed\./i.test(line)) return 100;
+          return null;
+        } catch {
+          return null;
+        }
+      };
+
+      let outBuf = '';
+      let errBuf = '';
+      let latestPercent: number | null = null;
+      let flushTimer: NodeJS.Timeout | null = null;
+      const scheduleFlush = () => {
+        if (flushTimer) return;
+        flushTimer = setTimeout(() => {
+          flushTimer = null;
+          try {
+            if (outBuf) {
+              event.sender.send('steamcmd-progress', { type: 'output', data: outBuf });
+              outBuf = '';
+            }
+            if (errBuf) {
+              event.sender.send('steamcmd-progress', { type: 'error', data: errBuf });
+              errBuf = '';
+            }
+            if (latestPercent != null) {
+              event.sender.send('steamcmd-progress', { type: 'percent', value: latestPercent });
+            }
+          } catch {}
+        }, 50); // flush every 50ms max
+      };
+
+      const handleChunk = (chunk: string, isError = false) => {
+        if (!chunk) return;
+        const p = parsePercent(chunk);
+        if (p != null) latestPercent = p;
+        if (isError) errBuf += chunk; else outBuf += chunk;
+        scheduleFlush();
+      };
 
       steamcmd.stdout.on('data', (data) => {
         const dataStr = data.toString();
         output += dataStr;
         console.log('SteamCMD output:', dataStr);
-        
-        // Send progress updates to renderer
-        event.sender.send('steamcmd-progress', {
-          type: 'output',
-          data: dataStr
-        });
+        handleChunk(dataStr, false);
       });
 
       steamcmd.stderr.on('data', (data) => {
         const dataStr = data.toString();
         errorOutput += dataStr;
         console.log('SteamCMD error output:', dataStr);
-        
-        // Send progress updates to renderer
-        event.sender.send('steamcmd-progress', {
-          type: 'error',
-          data: dataStr
-        });
+        handleChunk(dataStr, true);
       });
 
       steamcmd.on('close', (code) => {
         const fullOutput = output + errorOutput;
         console.log('SteamCMD download completed with code:', code);
-
+        currentDownloadProc = null;
+        // Final flush to ensure last chunks are delivered
+        try {
+          if (outBuf) event?.sender?.send('steamcmd-progress', { type: 'output', data: outBuf });
+          if (errBuf) event?.sender?.send('steamcmd-progress', { type: 'error', data: errBuf });
+          if (latestPercent != null) event?.sender?.send('steamcmd-progress', { type: 'percent', value: latestPercent });
+        } catch {}
         if (code === 0) {
-          console.log('Branch download successful');
           resolve({ success: true });
         } else {
-          console.log('Branch download failed');
-          resolve({ 
-            success: false, 
-            error: `Download failed: ${fullOutput || 'Unknown error'}` 
-          });
+          resolve({ success: false, error: `Download failed: ${fullOutput || 'Unknown error'}`, output: fullOutput });
         }
       });
 
       steamcmd.on('error', (error) => {
         console.error('SteamCMD download error:', error);
-        resolve({ 
-          success: false, 
-          error: `Failed to execute SteamCMD: ${error.message}` 
-        });
+        resolve({ success: false, error: `Failed to execute SteamCMD: ${error.message}` });
       });
-
-      // Set a longer timeout for downloads
-      setTimeout(() => {
-        steamcmd.kill();
-        resolve({ 
-          success: false, 
-          error: 'Branch download timed out' 
-        });
-      }, 300000); // 5 minute timeout
     });
+
+    let lastError: string | undefined;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const waitMs = backoffs[Math.min(attempt, backoffs.length - 1)];
+      if (waitMs > 0) {
+        const msg = `Retrying download (attempt ${attempt+1}/${maxAttempts}) in ${Math.round(waitMs/1000)}s...`;
+        console.log(msg);
+        event?.sender?.send('steamcmd-progress', { type: 'info', message: msg });
+        await wait(waitMs);
+      }
+
+      const res = await attemptOnce();
+      if (res.success) return { success: true };
+
+      lastError = res.error;
+      const out = (res.output || '').toLowerCase();
+      const loginFailure = out.includes('login failure') || out.includes('invalid password') || out.includes('account logon denied');
+      const steamRunning = out.includes('steam is running');
+
+      if (!loginFailure && !steamRunning && attempt === 0) {
+        // Non-retryable immediate error; break and report
+        break;
+      }
+      if (attempt === maxAttempts - 1) {
+        break;
+      }
+    }
+
+    return { success: false, error: lastError || 'Download failed' };
 
   } catch (error) {
     console.error('Error during branch download:', error);
-    return { 
-      success: false, 
-      error: `Download error: ${error instanceof Error ? error.message : 'Unknown error'}` 
-    };
+    return { success: false, error: `Download error: ${error instanceof Error ? error.message : 'Unknown error'}` };
   }
 }
 
@@ -435,6 +533,79 @@ export function setupSteamCMDHandlers(): void {
 
   // Download branch
   ipcMain.handle('steamcmd:download-branch', handleDownloadBranch);
+
+  // Cancel current SteamCMD download (if any)
+  ipcMain.handle('steamcmd:cancel', async () => {
+    try {
+      if (currentDownloadProc) {
+        console.log('Cancelling SteamCMD download process...');
+        currentDownloadProc.kill();
+        return { success: true };
+      }
+      return { success: false, error: 'No active SteamCMD download' };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  // Get branch build ID via SteamCMD app_info_print
+  ipcMain.handle('steamcmd:get-branch-buildid', async (event, steamCMDPath: string, username: string, password: string, appId: string, branchId: string) => {
+    try {
+      // Resolve steamcmd.exe
+      const stat = await fs.stat(steamCMDPath);
+      const steamcmdExe = stat.isDirectory() ? path.join(steamCMDPath, 'steamcmd.exe') : steamCMDPath;
+      if (!await fs.pathExists(steamcmdExe)) {
+        return { success: false, error: 'steamcmd.exe not found' };
+      }
+
+      return await new Promise<{success: boolean, buildId?: string, error?: string}>((resolve) => {
+        const args = [
+          '+@ShutdownOnFailedCommand', '1',
+          '+@NoPromptForPassword', '1',
+          '+login', username, password,
+          '+app_info_print', appId,
+          '+quit'
+        ];
+
+        const child = spawn(steamcmdExe, args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        let output = '';
+        let errorOut = '';
+
+        const tryResolve = (merged: string) => {
+          try {
+            const branchKey = branchId?.toLowerCase() === 'main' ? 'public' : branchId;
+            const regex = new RegExp(`"${branchKey}"[\n\r\t\s\S]*?"buildid"\s*"(\\d+)"`, 'i');
+            const match = merged.match(regex);
+            if (match && match[1]) {
+              resolve({ success: true, buildId: match[1] });
+              return true;
+            }
+          } catch {}
+          return false;
+        };
+
+        child.stdout.on('data', (d) => {
+          const s = d.toString();
+          output += s;
+        });
+        child.stderr.on('data', (d) => {
+          const s = d.toString();
+          errorOut += s;
+        });
+        child.on('close', () => {
+          const merged = output + '\n' + errorOut;
+          if (!tryResolve(merged)) {
+            resolve({ success: false, error: 'Failed to parse build ID from SteamCMD output' });
+          }
+        });
+        child.on('error', (err) => {
+          resolve({ success: false, error: `Failed to execute SteamCMD: ${err.message}` });
+        });
+      });
+    } catch (err) {
+      return { success: false, error: `Error getting build ID: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  });
 
   console.log('SteamCMD IPC handlers registered successfully');
 }

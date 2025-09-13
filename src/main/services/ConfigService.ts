@@ -87,8 +87,10 @@ export class ConfigService {
       customLaunchCommands: {},
       lastUpdated: new Date().toISOString(),
       configVersion: '2.0',
-      useSteamCMD: false,
-      steamCMDPath: null
+      useDepotDownloader: false,
+      depotDownloaderPath: null,
+      logRetentionCount: 50,
+      diskSpaceThresholdGB: 10
     };
   }
   
@@ -278,8 +280,10 @@ export class ConfigService {
         customLaunchCommands: config.customLaunchCommands || {},
         lastUpdated: config.lastUpdated || new Date().toISOString(),
         configVersion: config.configVersion || '2.0',
-        useSteamCMD: config.useSteamCMD || false,
-        steamCMDPath: config.steamCMDPath || null
+        useDepotDownloader: config.useDepotDownloader || false,
+        depotDownloaderPath: config.depotDownloaderPath || null,
+        logRetentionCount: typeof config.logRetentionCount === 'number' ? config.logRetentionCount : 50,
+        diskSpaceThresholdGB: typeof config.diskSpaceThresholdGB === 'number' ? config.diskSpaceThresholdGB : 10
       };
       
       // Load the config into the store
@@ -303,4 +307,5 @@ export class ConfigService {
       return false;
     }
   }
+
 }
