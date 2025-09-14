@@ -19,6 +19,9 @@ export interface DevEnvironmentConfig {
   // Enhanced settings for DepotDownloader
   depotDownloaderMaxDownloads?: number; // parallel download threads (default: 8)
   depotDownloaderRememberPassword?: boolean; // use -remember-password flag (default: true)
+  // Post-download actions
+  autoInstallMelonLoader?: boolean; // Auto-install MelonLoader after downloads (default: true)
+  autoInstallPromptShown?: boolean; // Whether user has been prompted in setup (default: false)
   // Steam Update Service settings
   steamUpdateSettings?: SteamUpdateSettings;
   lastKnownChangenumbers?: Record<string, number>; // branch name -> changenumber

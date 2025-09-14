@@ -42,7 +42,11 @@ export class LoggingService {
    */
   constructor(configService: ConfigService) {
     this.configService = configService;
-    this.logFile = path.join(configService.getLogsPath(), `app-${new Date().toISOString().split('T')[0]}.log`);
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const ts = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}-${pad(now.getHours())}-${pad(now.getMinutes())}`;
+    // Name log file from the moment it is created: DD-MM-YYYY-HH-MM.log
+    this.logFile = path.join(configService.getLogsPath(), `${ts}.log`);
     console.log(`LoggingService initialized. Log file: ${this.logFile}`);
   }
   

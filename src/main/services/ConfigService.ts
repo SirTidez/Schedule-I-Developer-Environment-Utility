@@ -89,6 +89,8 @@ export class ConfigService {
       configVersion: '3.0',
       useDepotDownloader: false,
       depotDownloaderPath: null,
+      autoInstallMelonLoader: true,
+      autoInstallPromptShown: false,
       logRetentionCount: 50,
       diskSpaceThresholdGB: 10
     };
@@ -282,6 +284,8 @@ export class ConfigService {
         configVersion: config.configVersion || '3.0',
         useDepotDownloader: config.useDepotDownloader || false,
         depotDownloaderPath: config.depotDownloaderPath || null,
+        autoInstallMelonLoader: typeof config.autoInstallMelonLoader === 'boolean' ? config.autoInstallMelonLoader : true,
+        autoInstallPromptShown: typeof config.autoInstallPromptShown === 'boolean' ? config.autoInstallPromptShown : false,
         logRetentionCount: typeof config.logRetentionCount === 'number' ? config.logRetentionCount : 50,
         diskSpaceThresholdGB: typeof config.diskSpaceThresholdGB === 'number' ? config.diskSpaceThresholdGB : 10
       };

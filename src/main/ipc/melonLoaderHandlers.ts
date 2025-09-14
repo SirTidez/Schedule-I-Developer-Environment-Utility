@@ -1,20 +1,11 @@
 import { ipcMain } from 'electron';
-import { spawn } from 'child_process';
 import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs-extra';
 import { LoggingService } from '../services/LoggingService';
+import extract from 'extract-zip';
 
 const MELON_URL = 'https://github.com/LavaGang/MelonLoader/releases/latest/download/MelonLoader.x64.zip';
-
-function runPowerShell(psCommand: string): Promise<{ code: number; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand], { windowsHide: true });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (d) => (stdout += d.toString()))
-    child.stderr.on('data', (d) => (stderr += d.toString()))
-    child.on('close', (code) => resolve({ code: code ?? -1, stdout, stderr }));
-  });
-}
 
 export function registerMelonLoaderHandlers(logging: LoggingService) {
   ipcMain.handle('melonloader:install', async (event, branchPath: string) => {
@@ -23,24 +14,46 @@ export function registerMelonLoaderHandlers(logging: LoggingService) {
         throw new Error('Invalid branch path');
       }
 
-      // Ensure destination path is quoted for PowerShell
-      const zipVar = 'MLZip_' + Date.now();
-      const dest = branchPath.replace(/`/g, '``').replace(/'/g, "''");
-      const ps = [
-        `$tempZip = Join-Path $env:TEMP ('${zipVar}.zip')`,
-        `Write-Output ('Downloading MelonLoader to ' + $tempZip)`,
-        `Invoke-WebRequest -Uri '${MELON_URL}' -OutFile $tempZip -UseBasicParsing`,
-        `Write-Output ('Expanding to ${dest}')`,
-        `Expand-Archive -Path $tempZip -DestinationPath '${dest}' -Force`,
-        `Remove-Item $tempZip -Force`
-      ].join('; ');
-
       await logging.info(`Installing MelonLoader into: ${branchPath}`);
-      const { code, stdout, stderr } = await runPowerShell(ps);
-      if (code !== 0) {
-        await logging.error(`MelonLoader install failed (code ${code}): ${stderr || stdout}`);
-        return { success: false, error: stderr || stdout || `PowerShell exited with code ${code}` };
+
+      // 1) Download the zip to the system temp directory via Node (robust TLS)
+      const tmpDir = os.tmpdir();
+      const tmpZip = path.join(tmpDir, `MelonLoader_${Date.now()}.zip`);
+      await logging.info(`Downloading MelonLoader to temp: ${tmpZip}`);
+      const res = await fetch(MELON_URL);
+      if (!res.ok) {
+        await logging.error(`Failed HTTP download for MelonLoader: ${res.status} ${res.statusText}`);
+        return { success: false, error: `Download failed: ${res.status} ${res.statusText}` };
       }
+      await fs.ensureDir(path.dirname(tmpZip));
+      const ab = await res.arrayBuffer();
+      await fs.writeFile(tmpZip, Buffer.from(ab));
+
+      // 2) Extract using lightweight JS unzip (extract-zip)
+      await fs.ensureDir(branchPath);
+      await logging.info('Extracting MelonLoader using extract-zip...');
+      await extract(tmpZip, { dir: branchPath });
+      await fs.remove(tmpZip).catch(() => {});
+
+      // Basic integrity check for expected files/folders
+      const mustExist = [
+        path.join(branchPath, 'MelonLoader'),
+        path.join(branchPath, 'version.dll'),
+      ];
+      const missing: string[] = [];
+      for (const p of mustExist) {
+        try {
+          if (!(await fs.pathExists(p))) missing.push(path.basename(p));
+        } catch {
+          missing.push(path.basename(p));
+        }
+      }
+      if (missing.length > 0) {
+        const msg = `MelonLoader integrity check failed: missing ${missing.join(', ')}`;
+        await logging.error(msg);
+        return { success: false, error: msg };
+      }
+
       await logging.info('MelonLoader installed successfully');
       return { success: true };
     } catch (error) {
@@ -49,4 +62,3 @@ export function registerMelonLoaderHandlers(logging: LoggingService) {
     }
   });
 }
-

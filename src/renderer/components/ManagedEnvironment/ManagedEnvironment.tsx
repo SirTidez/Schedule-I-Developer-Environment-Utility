@@ -247,15 +247,18 @@ const ManagedEnvironment: React.FC = () => {
               }
             } catch {}
 
-            // Install MelonLoader into the branch root
+            // Install MelonLoader into the branch root if enabled
             try {
-              const mlRes = await window.electronAPI.melonloader.install(branchInfo.path);
-              if (mlRes?.success) {
-                setToastMsg('MelonLoader installed');
-                setTimeout(() => setToastMsg(null), 4000);
-              } else if (mlRes?.error) {
-                setToastMsg('MelonLoader install failed');
-                setTimeout(() => setToastMsg(null), 4000);
+              const cfg = await window.electronAPI.config.get();
+              if (cfg?.autoInstallMelonLoader) {
+                const mlRes = await window.electronAPI.melonloader.install(branchInfo.path);
+                if (mlRes?.success) {
+                  setToastMsg('MelonLoader installed');
+                  setTimeout(() => setToastMsg(null), 4000);
+                } else if (mlRes?.error) {
+                  setToastMsg('MelonLoader install failed');
+                  setTimeout(() => setToastMsg(null), 4000);
+                }
               }
             } catch (e) {
               setToastMsg('MelonLoader install failed');

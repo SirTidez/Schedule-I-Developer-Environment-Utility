@@ -211,6 +211,7 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 - **Issues**: [GitHub Issues](https://github.com/SirTidez/Schedule-I-Developer-Environment-Utility/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/SirTidez/Schedule-I-Developer-Environment-Utility/discussions)
+- **Project Board**: [Trello Board](https://trello.com/b/QqiNHMx7/schedule-i-developer-environment-utility) - Track development progress and roadmap
 - **Discord**: [Join our Discord](https://discord.gg/schedulei) for community support
 
 ---

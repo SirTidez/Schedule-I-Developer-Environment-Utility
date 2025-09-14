@@ -13,7 +13,13 @@
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
       "Bash(npm run build:*)",
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "mcp__trello__create_list",
+      "mcp__trello__create_card",
+      "mcp__trello__get_cards",
+      "mcp__trello__get_card_checklists",
+      "mcp__trello__create_checklist",
+      "mcp__trello__add_checkitem"
     ],
     "deny": [],
     "ask": []

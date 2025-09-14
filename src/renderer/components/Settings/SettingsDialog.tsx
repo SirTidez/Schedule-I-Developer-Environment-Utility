@@ -12,6 +12,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [configDir, setConfigDir] = useState<string>('');
   const [logsDir, setLogsDir] = useState<string>('');
+  const [autoInstallMelon, setAutoInstallMelon] = useState<boolean>(true);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -20,6 +21,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose }) => {
         const cfg = await window.electronAPI.config.get();
         setLogRetentionCount(Number(cfg?.logRetentionCount ?? 50));
         setDiskSpaceThresholdGB(Number(cfg?.diskSpaceThresholdGB ?? 10));
+        setAutoInstallMelon(Boolean(cfg?.autoInstallMelonLoader ?? true));
         try {
           const cdir = await window.electronAPI.config.getConfigDir();
           const ldir = await window.electronAPI.config.getLogsDir();
@@ -39,6 +41,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose }) => {
       await window.electronAPI.config.update({
         logRetentionCount: Math.max(1, Math.floor(logRetentionCount)),
         diskSpaceThresholdGB: Math.max(0, Math.floor(diskSpaceThresholdGB)),
+        autoInstallMelonLoader: !!autoInstallMelon,
       });
       onClose();
     } catch (e) {
@@ -60,6 +63,18 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose }) => {
         )}
 
         <div className="space-y-4">
+          <div>
+            <label className="flex items-center space-x-3 text-sm">
+              <input
+                type="checkbox"
+                checked={autoInstallMelon}
+                onChange={(e) => setAutoInstallMelon(e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500 rounded"
+              />
+              <span>Auto-install MelonLoader after branch downloads</span>
+            </label>
+            <p className="text-xs text-gray-400 mt-1">You can toggle this anytime. Default is enabled.</p>
+          </div>
           <div className="bg-gray-900/40 border border-gray-700 rounded p-3">
             <div className="text-xs text-gray-400">Config directory:</div>
             <div className="text-sm text-gray-200 break-all">{configDir || 'Unknown'}</div>

@@ -122,8 +122,8 @@ const SetupWizard: React.FC = () => {
       case 5:
         return (
           <SteamLoginStep
-            onLoginSuccess={(creds) => setSteamCredentials(creds)}
-            onSkipLogin={() => setSteamCredentials(null)}
+            onLoginSuccess={(creds) => { setSteamCredentials(creds); setCurrentStep(6); }}
+            onSkipLogin={() => { setSteamCredentials(null); setCurrentStep(6); }}
             depotDownloaderPath={depotDownloaderPath}
             useDepotDownloader={useDepotDownloader}
           />
@@ -192,7 +192,7 @@ const SetupWizard: React.FC = () => {
                 Previous
               </button>
               {/* Hide Next on Steam Login step; login action progresses */}
-              {(currentStep !== 4 && currentStep !== 5) && (
+              {currentStep !== 5 && (
                 <button 
                   className="btn-primary"
                   onClick={handleNext}

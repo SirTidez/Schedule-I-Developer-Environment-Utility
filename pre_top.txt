@@ -171,11 +171,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     clear: () => ipcRenderer.invoke('cred-cache:clear')
   },
 
-  // MelonLoader installer
-  melonloader: {
-    install: (branchPath: string) => ipcRenderer.invoke('melonloader:install', branchPath)
-  },
-
   // Steam update event listeners
   onSteamUpdateConnected: (callback: () => void) => {
     ipcRenderer.on('steam-update:connected', callback);
@@ -327,9 +322,6 @@ declare global {
         set: (creds: { username: string; password: string }) => Promise<{ success: boolean; error?: string }>;
         get: () => Promise<{ success: boolean; credentials?: { username: string; password: string } | null }>;
         clear: () => Promise<{ success: boolean }>;
-      };
-      melonloader: {
-        install: (branchPath: string) => Promise<{ success: boolean; error?: string }>;
       };
     };
   }

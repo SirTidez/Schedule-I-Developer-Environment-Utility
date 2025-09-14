@@ -80,9 +80,13 @@ const updateService = new UpdateService(loggingService, configService.getConfigD
  * @returns void
  */
 function createWindow(): void {
-  // Get the icon path for both development and production
-  const iconPath = path.join(__dirname, '../../Assets/icon.png');
-  const appIcon = nativeImage.createFromPath(iconPath);
+  // Pick best icon for platform; prefer .ico on Windows (dev server/titlebar icon)
+  const icoPath = path.join(__dirname, '../../Assets/icon.ico');
+  const pngPath = path.join(__dirname, '../../Assets/icon.png');
+  let appIcon = nativeImage.createFromPath(process.platform === 'win32' ? icoPath : pngPath);
+  if (!appIcon || appIcon.isEmpty()) {
+    appIcon = nativeImage.createFromPath(pngPath);
+  }
   
   // Create the browser window with custom configuration
   const versionLabel = updateService.getCurrentVersion();

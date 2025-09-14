@@ -56,8 +56,12 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
   const [failureDetails, setFailureDetails] = useState<string>('');
   const [failureResolve, setFailureResolve] = useState<((decision: 'retry'|'skip'|'cancel') => void) | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState<string>('Please Confirm');
+  const [confirmYesText, setConfirmYesText] = useState<string>('Continue');
+  const [confirmNoText, setConfirmNoText] = useState<string>('Cancel');
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmResolve, setConfirmResolve] = useState<((ok: boolean) => void) | null>(null);
+  const [autoPromptResolved, setAutoPromptResolved] = useState(false);
 
   // Branch display names mapping
   const branchDisplayNames: Record<string, string> = {
@@ -92,7 +96,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
     // If DepotDownloader is desired, wait until we have credentials
     const readyForDepotDownloader = useDepotDownloader && !!effectiveCreds;
     const shouldStart = useDepotDownloader ? readyForDepotDownloader : true;
-    if (!shouldStart) return;
+    if (!shouldStart || !autoPromptResolved) return;
     if (startedRef.current) return;
     startedRef.current = true;
 
@@ -100,7 +104,28 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
     setDownloadMethod(method);
     addTerminalLog(method === 'depotdownloader' ? 'Using DepotDownloader for branch downloads' : 'Using manual file copying');
     startCopyProcess(method);
-  }, [steamLibraryPath, managedEnvironmentPath, selectedBranches, useDepotDownloader, depotDownloaderPath, effectiveCreds]);
+  }, [steamLibraryPath, managedEnvironmentPath, selectedBranches, useDepotDownloader, depotDownloaderPath, effectiveCreds, autoPromptResolved]);
+
+  // First-run prompt to enable/disable auto-install MelonLoader
+  useEffect(() => {
+    (async () => {
+      try {
+        const cfg = await window.electronAPI.config.get();
+        if (!cfg?.autoInstallPromptShown) {
+          const decision = await showConfirmDialog(
+            'Install MelonLoader automatically after each branch download? You can change this later in Settings.',
+            'Auto-install MelonLoader',
+            'Yes',
+            'No'
+          );
+          await window.electronAPI.config.update({ autoInstallMelonLoader: decision, autoInstallPromptShown: true });
+        }
+      } catch {}
+      finally {
+        setAutoPromptResolved(true);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     // Set up progress event listener
@@ -351,7 +376,10 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
     });
   };
 
-  const showConfirmDialog = (message: string): Promise<boolean> => {
+  const showConfirmDialog = (message: string, title = 'Please Confirm', yesText = 'Continue', noText = 'Cancel'): Promise<boolean> => {
+    setConfirmTitle(title);
+    setConfirmYesText(yesText);
+    setConfirmNoText(noText);
     setConfirmMessage(message);
     setConfirmOpen(true);
     return new Promise((resolve) => setConfirmResolve(() => resolve));
@@ -395,7 +423,12 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
           const freeGB = disk.freeBytes / (1024 ** 3);
           addTerminalLog(`Free space on ${disk.drive ?? '?'}: ${freeGB.toFixed(2)} GB`);
           if (freeGB < thresholdGB) {
-            const proceed = await showConfirmDialog(`Only ${freeGB.toFixed(2)} GB free; recommended minimum is ${thresholdGB} GB. Continue anyway?`);
+            const proceed = await showConfirmDialog(
+              `Only ${freeGB.toFixed(2)} GB free; recommended minimum is ${thresholdGB} GB. Continue anyway?`,
+              'Low Disk Space',
+              'Continue Anyway',
+              'Cancel'
+            );
             if (!proceed) {
               addTerminalLog('Operation cancelled due to low disk space.');
               await closeSessionLog('cancelled');
@@ -703,14 +736,19 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
         addTerminalLog(`⚠ Error retrieving build ID: ${e instanceof Error ? e.message : String(e)}`);
       }
 
-      // Install MelonLoader into the new branch root
+      // Install MelonLoader into the new branch root if enabled
       try {
-        addTerminalLog('Installing MelonLoader into branch root...');
-        const res = await window.electronAPI.melonloader.install(branchPath);
-        if (res?.success) {
-          addTerminalLog('✓ MelonLoader installed');
+        const cfg = await window.electronAPI.config.get();
+        if (cfg?.autoInstallMelonLoader) {
+          addTerminalLog('Installing MelonLoader into branch root...');
+          const res = await window.electronAPI.melonloader.install(branchPath);
+          if (res?.success) {
+            addTerminalLog('✓ MelonLoader installed');
+          } else {
+            addTerminalLog(`⚠ MelonLoader install failed${res?.error ? `: ${res.error}` : ''}`);
+          }
         } else {
-          addTerminalLog(`⚠ MelonLoader install failed${res?.error ? `: ${res.error}` : ''}`);
+          addTerminalLog('Skipping MelonLoader install (disabled in settings)');
         }
       } catch (e) {
         addTerminalLog(`⚠ MelonLoader install error: ${e instanceof Error ? e.message : String(e)}`);
@@ -999,10 +1037,10 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
       {/* Confirm Dialog */}
       <ConfirmDialog
         isOpen={confirmOpen}
-        title="Low Disk Space"
+        title={confirmTitle}
         message={confirmMessage}
-        confirmText="Continue Anyway"
-        cancelText="Cancel"
+        confirmText={confirmYesText}
+        cancelText={confirmNoText}
         onConfirm={handleConfirmYes}
         onCancel={handleConfirmNo}
       />

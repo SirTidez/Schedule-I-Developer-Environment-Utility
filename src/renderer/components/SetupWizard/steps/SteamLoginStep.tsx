@@ -2,13 +2,14 @@
  * Steam Login Step Component for Schedule I Developer Environment Utility
  * 
  * Handles Steam account authentication for SteamCMD integration. Provides
- * secure login interface with Steam Guard support and credential management.
+ * secure login interface with Steam Guard support. Credentials are used securely
+ * for this session only and are not stored on disk.
  * 
  * Key features:
  * - Steam process detection and warnings
  * - Username/password input with validation
  * - Steam Guard authentication handling
- * - Secure credential storage options
+ * - Session‑only credential usage (no local storage)
  * - Real-time login progress feedback
  * 
  * @author Schedule I Developer Environment Utility Team
@@ -47,7 +48,7 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
 }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [stayLoggedIn, setStayLoggedIn] = useState(false);
+  // Session-only; we do not offer stay-logged-in
   const [steamProcess, setSteamProcess] = useState<SteamProcessStatus | null>(null);
   const [loginStatus, setLoginStatus] = useState<LoginStatus>({
     isLoggingIn: false,
@@ -161,7 +162,7 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
         try { await window.electronAPI?.credCache?.set?.({ username, password }); } catch {}
 
         // Notify parent component
-        onLoginSuccess({ username, password, stayLoggedIn });
+        onLoginSuccess({ username, password, stayLoggedIn: false });
       } else if ((result as any).requiresSteamGuard || (result as any).steamGuardRequired) {
         setLoginStatus(prev => ({
           ...prev,
@@ -285,7 +286,7 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
         <h3 className="text-lg font-semibold mb-2">Steam Account Login</h3>
         <p className="text-gray-300 mb-4">
           Log in to your Steam account to enable automated branch downloading with DepotDownloader.
-          Your credentials will be used securely and can be stored locally if you choose.
+          Your credentials are used securely for this session only and are not stored on disk. Steam Guard is supported.
         </p>
       </div>
 
@@ -440,8 +441,7 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
             <div>
               <h4 className="font-semibold text-green-300">Login Successful!</h4>
               <p className="text-green-200 text-sm">
-                You are now logged in as <strong>{username}</strong>. 
-                {stayLoggedIn ? ' Your credentials have been stored securely.' : ''}
+                You are now logged in as <strong>{username}</strong>. Credentials are held in memory for this session only.
               </p>
             </div>
           </div>
