@@ -37,41 +37,6 @@ const credentialService = new CredentialService();
 let currentDownloadProc: ChildProcess | null = null;
 let currentLoginProc: ChildProcess | null = null;
 
-// Basic input validation helpers (defense-in-depth)
-function containsControlChars(value: string): boolean {
-  return /[\x00-\x1F\x7F]/.test(value);
-}
-
-function isSafeUsername(value: string): boolean {
-  if (!value || typeof value !== 'string') return false;
-  if (value.length > 256) return false;
-  if (containsControlChars(value)) return false;
-  return true;
-}
-
-function isSafePassword(value: string): boolean {
-  if (!value || typeof value !== 'string') return false;
-  if (value.length > 512) return false;
-  if (containsControlChars(value)) return false;
-  return true;
-}
-
-function isSafePath(value: string): boolean {
-  if (!value || typeof value !== 'string') return false;
-  if (value.length > 1024) return false;
-  if (containsControlChars(value)) return false;
-  return true;
-}
-
-function isSafeAppId(value: string): boolean {
-  return typeof value === 'string' && /^\d{1,10}$/.test(value);
-}
-
-function isSafeBranchId(value: string): boolean {
-  // Allow alphanumerics and dashes/underscores (e.g., public, beta, alternate-beta)
-  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value) && !containsControlChars(value);
-}
-
 // Helper to resolve DepotDownloader command from optional path or PATH/alias
 async function resolveDepotDownloaderCommand(depotDownloaderPath?: string): Promise<{ cmd: string, shell: boolean, error?: string }> {
   try {
@@ -87,10 +52,10 @@ async function resolveDepotDownloaderCommand(depotDownloaderPath?: string): Prom
       return { cmd: exe, shell: false };
     }
 
-    // Try common command names on PATH without shell (safer)
+    // Try common command names on PATH via shell
     const candidates = ['DepotDownloader', 'depotdownloader', 'DepotDownloader.exe'];
-    // Optimistically return first candidate; spawn will search PATH
-    return { cmd: candidates[0], shell: false };
+    // Optimistically return first candidate; spawn will error if not found
+    return { cmd: candidates[0], shell: true };
   } catch (e) {
     return { cmd: '', shell: false, error: e instanceof Error ? e.message : String(e) };
   }
@@ -112,7 +77,7 @@ async function handleValidateInstallation(event: any, depotDownloaderPath?: stri
     console.log('Validating DepotDownloader installation', depotDownloaderPath ? `at: ${depotDownloaderPath}` : '(from PATH/alias)');
 
     const trySpawnVersion = (cmd: string, args: string[], useShell: boolean) => new Promise<{ok: boolean, version?: string, output?: string}>(resolve => {
-      const child = spawn(cmd, args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = spawn(cmd, args, { shell: useShell, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 
       let output = '';
       let errorOutput = '';
@@ -158,9 +123,9 @@ async function handleValidateInstallation(event: any, depotDownloaderPath?: stri
 
     // No path provided: try resolving via PATH/alias with a few common spellings
     const candidates = [
-      { cmd: 'DepotDownloader', shell: false },
-      { cmd: 'depotdownloader', shell: false },
-      { cmd: 'DepotDownloader.exe', shell: false }
+      { cmd: 'DepotDownloader', shell: true },
+      { cmd: 'depotdownloader', shell: true },
+      { cmd: 'DepotDownloader.exe', shell: true }
     ];
     for (const c of candidates) {
       const res = await trySpawnVersion(c.cmd, ['--version'], c.shell);
@@ -202,11 +167,8 @@ async function handleLogin(event: any, depotDownloaderPath: string | undefined, 
       };
     }
 
-    if (!isSafeUsername(username)) {
-      return { success: false, error: 'Invalid username' };
-    }
-    if (!isSafePassword(password)) {
-      return { success: false, error: 'Invalid password' };
+    if (!username || !password) {
+      return { success: false, error: 'Username and password are required' };
     }
 
     // Resolve DepotDownloader command from provided path or PATH/alias
@@ -223,7 +185,7 @@ async function handleLogin(event: any, depotDownloaderPath: string | undefined, 
       ];
 
       const depotDownloader = spawn(resolved.cmd, args, {
-        shell: false,
+        shell: resolved.shell,
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -443,17 +405,10 @@ async function handleDownloadBranch(event: any, depotDownloaderPath: string | un
 
     const attemptOnce = () => new Promise<{success: boolean, error?: string, output?: string}>((resolve) => {
       const args = buildArgs();
-      // Prepare a safe printable command string while masking sensitive args
-      const maskedArgs: string[] = [];
-      for (let i = 0; i < args.length; i++) {
-        const a = args[i];
-        if (a === '-password' && i + 1 < args.length) { maskedArgs.push('-password', '***'); i++; continue; }
-        maskedArgs.push(a);
-      }
-      const printable = [resolved.cmd, ...maskedArgs.map(a => (a.includes(' ') ? `"${a}"` : a))].join(' ');
+      const printable = [resolved.cmd, ...args.map(a => (a.includes(' ') ? `"${a}"` : a))].join(' ');
       console.log('Launching DepotDownloader:', printable);
-      const depotDownloader = spawn(resolved.cmd, args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-      try { event?.sender?.send('depotdownloader-progress', { type: 'info', message: 'Launching DepotDownloader...' }); } catch {}
+      const depotDownloader = spawn(resolved.cmd, args, { shell: resolved.shell, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      try { event?.sender?.send('depotdownloader-progress', { type: 'info', message: `Launching DepotDownloader: ${printable}` }); } catch {}
       currentDownloadProc = depotDownloader;
 
       let output = '';

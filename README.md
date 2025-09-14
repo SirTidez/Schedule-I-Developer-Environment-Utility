@@ -1,6 +1,6 @@
 # Schedule I Developer Environment Utility - Electron Edition
 
-**Version 2.0.3** - Enhanced Update System & Package Organization
+**Version 2.1.1** - DepotDownloader Integration & MelonLoader Auto-Install
 
 ## 🎮 What is Schedule I Developer Environment?
 
@@ -41,17 +41,26 @@ This is the Electron-based version of the Schedule I Developer Environment Utili
 
 ### 🔄 **Branch Management**
 - **Multi-branch Support**: Copy and manage multiple development branches
-- **Progress Tracking**: Real-time progress bars during file operations
+- **Progress Tracking**: Real-time progress bars during file operations with cancel support
 - **Status Verification**: Accurate branch status detection and display
 - **Update Detection**: Identify when branches need updates
+- **Repair Status**: Shows "Needs Repair" for incomplete installations
 
 ### 🛠️ **Development Tools**
 - **Mod Management**: Handle runtime-specific mod installations
+- **MelonLoader Integration**: Automatic MelonLoader installation after downloads
 - **Default Mods**: Install default mods to selected branches
 - **Branch Deletion**: Safe deletion of managed branch instances
 - **Configuration Management**: Persistent settings with validation
 
-### 🔄 **Update System** (v2.0.3)
+### 📥 **DepotDownloader Integration** (v2.1.1)
+- **Modern Steam Downloads**: Direct DepotDownloader integration replacing legacy SteamCMD
+- **Secure Execution**: No shell execution, masked passwords, input validation
+- **Parallel Downloads**: Configurable thread counts for faster downloads
+- **QR Code Authentication**: Steam Guard support with QR codes
+- **Build ID Extraction**: Manifest-based branch verification
+
+### 🔄 **Update System**
 - **Fresh Version Display**: Current app version always shows fresh (never cached)
 - **Optimized Caching**: Latest release info cached for 1 hour for better performance
 - **Manual Update Checks**: Trigger update checks via refresh button
@@ -67,6 +76,7 @@ This is the Electron-based version of the Schedule I Developer Environment Utili
 - **electron-builder**: ^26.0.12 (Packaging)
 - **electron-store**: ^10.1.0 (Configuration management)
 - **electron-log**: ^5.4.3 (Logging)
+- **extract-zip**: ^2.0.1 (MelonLoader extraction)
 
 ## 🛠️ Development Setup
 
@@ -104,13 +114,19 @@ npm run build:renderer # Renderer process only
 # Package for distribution
 npm run package
 
+# Clean previous builds
+npm run clean
+
+# Clean and rebuild for packaging
+npm run prepackage
+
 # Start built application
 npm run start
 ```
 
 ### Build Output
 - **Development**: Built files go to `dist/` directory
-- **Packaging**: Packaged executables go to `dist-v2.0.3/` directory
+- **Packaging**: Packaged executables go to `dist-v2.1.1/` directory
 
 ### Development Workflow
 1. **Start Development**: Run `npm run dev` to start both processes
@@ -129,13 +145,16 @@ Schedule I Developer Environment Utility/
 │   │   │   ├── SteamService.ts   # Steam integration
 │   │   │   ├── ConfigService.ts  # Configuration management
 │   │   │   ├── LoggingService.ts # Logging system
-│   │   │   └── UpdateService.ts  # Update checking
+│   │   │   ├── UpdateService.ts  # Update checking
+│   │   │   └── CredentialService.ts # Secure Steam credential storage
 │   │   └── ipc/                  # IPC handlers
 │   │       ├── steamHandlers.ts  # Steam operations
+│   │       ├── depotdownloaderHandlers.ts # DepotDownloader integration
 │   │       ├── configHandlers.ts # Configuration operations
 │   │       ├── fileHandlers.ts   # File operations
 │   │       ├── dialogHandlers.ts # Dialog operations
 │   │       ├── updateHandlers.ts # Update operations
+│   │       ├── steamLoginHandlers.ts # Steam authentication
 │   │       ├── shellHandlers.ts  # Shell operations
 │   │       └── windowHandlers.ts # Window management
 │   ├── renderer/                 # React frontend
@@ -153,8 +172,9 @@ Schedule I Developer Environment Utility/
 │   └── preload/                  # Preload scripts
 │       └── index.ts              # Secure API exposure
 ├── dist/                         # Built application
-├── dist-v2.0.3/                  # Packaged executables (v2.0.3)
-├── dist-v2/                      # Packaged executables (legacy v2.0.0)
+├── dist-v2.1.1/                 # Packaged executables (v2.1.1)
+├── dist-v2.0.3/                 # Packaged executables (v2.0.3)
+├── dist-v2/                     # Packaged executables (legacy v2.0.0)
 ├── Assets/                       # Application assets and icons
 ├── CSharp/                       # Legacy C# project (archived)
 ├── memories/                     # Development documentation
@@ -168,26 +188,40 @@ Schedule I Developer Environment Utility/
 The application uses electron-builder for packaging with support for multiple platforms:
 
 ### **Windows**
-- **Portable Executable**: `Schedule I Developer Environment 2.0.3.exe`
-- **NSIS Installer**: `Schedule I Developer Environment Setup 2.0.3.exe`
+- **Portable Executable**: `Schedule I Developer Environment 2.1.1.exe`
+- **NSIS Installer**: `Schedule I Developer Environment Setup 2.1.1.exe`
 - **Architecture**: x64
 - **Digital Signing**: All executables are digitally signed
 
 ### **Package Directories**
-- **Current Version**: `dist-v2.0.3/` (v2.0.3 packages)
+- **Current Version**: `dist-v2.1.1/` (v2.1.1 packages)
+- **Previous Versions**: `dist-v2.0.3/` and `dist-v2/` (legacy packages)
 
-## 🆕 Recent Changes (v2.0.3)
+## 🆕 Recent Changes (v2.1.1)
 
-### **Enhanced Update System**
-- **Fresh Version Display**: Current app version always shows fresh (never cached)
-- **Optimized Caching**: Latest release info cached for 1 hour instead of 24 hours
-- **Manual Update Checks**: Trigger update checks via refresh button in managed environment
-- **Better Performance**: Balanced approach between freshness and API efficiency
+### **🔒 Security Enhancements**
+- **Command Hardening**: Disabled shell execution for DepotDownloader spawns (uses argument arrays only)
+- **Password Protection**: Masked `-password` arguments in logs and progress messages
+- **Input Validation**: Basic validation for usernames, passwords, app IDs, branch IDs, and file paths
 
-### **Documentation Improvements**
-- **Comprehensive Updates**: 11 source files updated with detailed documentation
-- **Method Summaries**: JSDoc-style comments for all public methods
-- **Interface Documentation**: Complete documentation for all TypeScript interfaces
+### **🚀 MelonLoader Integration**
+- **Automatic Installation**: Downloads and extracts MelonLoader.x64.zip after successful branch downloads
+- **Integrity Verification**: Validates installation by checking for `MelonLoader/` folder and `version.dll`
+- **User Control**: Toggle auto-install in Settings (default ON) with first-run Setup Wizard prompt
+- **Safe Extraction**: Uses trusted `extract-zip` library for secure file extraction
+
+### **💫 Enhanced User Experience**
+- **Inline Steam Login**: Steam Session card shows login fields when needed, hidden when authenticated
+- **Per-Branch Progress**: Individual progress bars and cancel buttons for each branch operation
+- **Repair Detection**: Shows "Needs Repair" status for incomplete installations (missing `Schedule I.exe`)
+- **Direct Downloads**: Install/Reinstall uses DepotDownloader directly when configured and logged in
+- **Build ID Tracking**: Displays stored and live Steam build IDs with update availability flags
+
+### **🛠️ Setup Wizard Improvements**
+- **Clear Messaging**: Steam Login step explains session-only credentials (not stored on disk)
+- **Auto-Navigation**: Automatically advances to Copy step after successful login or skip
+- **Restored Controls**: Next button restored on DepotDownloader Integration step
+- **Dedicated Prompts**: MelonLoader auto-install uses its own dialog with appropriate messaging
 
 ## 🔄 Migration from C# Version
 

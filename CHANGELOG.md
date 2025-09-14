@@ -2,6 +2,58 @@
 
 All notable changes to the Schedule I Developer Environment Utility are documented in this file.
 
+## [2.1.1] - 2025-09-14
+
+### Highlights
+
+- DepotDownloader command hardening (no shell, masked passwords, input validation)
+- Automatic MelonLoader install after DepotDownloader downloads (safe OSS unzip)
+- Managed Environment UX: inline login, per-branch progress + cancel, repair status
+- Setup Wizard UX: clear Steam login messaging, restored Next on integration step, dedicated MelonLoader prompt
+- Version + packaging: v2.1.1, output to `dist-v2.1.1/`, cleaner prepackage
+
+### Security
+
+- Disabled shell execution for all DepotDownloader spawns (uses args arrays only)
+- Masked `-password` argument in logs and progress messages
+- Added basic input validation for username, password, appId, branchId, and paths
+
+### MelonLoader Integration
+
+- Added installer that downloads MelonLoader.x64.zip to temp and extracts using `extract-zip`
+- Integrity check after extraction (requires `MelonLoader/` folder and `version.dll`)
+- Auto-install toggled in Settings (default ON) with first-run prompt in Setup Wizard
+
+### Managed Environment
+
+- Steam Session: inline login fields when not logged in; hidden when logged in
+- Install/Reinstall: use DepotDownloader directly when enabled + logged in
+- Inline per-branch progress bar and Cancel button on cards
+- Installed only if `Schedule I.exe` exists; folder-only shows “Needs Repair”
+- Shows stored Build ID and live Steam Build; flags Update Available accordingly
+
+### Setup Wizard
+
+- Steam Login step: session-only credential messaging; auto-advance to Copy step on login/skip
+- DepotDownloader Integration step: Next button restored (login still owns progression)
+- Removed redundant Cancel button; retained inline cancel near progress
+- MelonLoader auto-install prompt uses its own dialog (not Low Disk Space)
+
+### Versioning & Packaging
+
+- App version: 2.1.1 (title bar and UI)
+- Output directory: `dist-v2.1.1/`
+- Added `clean` and `prepackage` scripts to remove previous outputs and rebuild
+- Windows dev icon: uses `Assets/icon.ico` (fallback to PNG)
+- Log filename: `DD-MM-YYYY-HH-MM.log`
+
+### Developer Notes
+
+- New IPC: `melonloader:install` (main) and preload `electronAPI.melonloader.install`
+- `extract-zip` added as dependency
+
+---
+
 ## [2.0.3] - 2025-01-10
 
 ### 🔧 **PATCH RELEASE: Update System Improvements & Package Organization**

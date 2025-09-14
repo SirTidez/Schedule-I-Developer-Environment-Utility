@@ -1,6 +1,6 @@
 {
   "name": "schedule-i-dev-environment",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Schedule I Developer Environment Utility - Electron Edition",
   "main": "dist/main/main/index.js",
   "scripts": {
@@ -13,7 +13,9 @@
     "package": "electron-builder",
     "start": "electron .",
     "start:main": "electron dist/main/main/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clean": "rimraf dist dist-v2.1.0 dist-v2.1.0-2 dist-v2.1.1",
+    "prepackage": "npm run clean && npm run build"
   },
   "keywords": [
     "electron",
@@ -28,7 +30,7 @@
     "appId": "com.schedulei.dev-environment",
     "productName": "Schedule I Developer Environment",
     "directories": {
-      "output": "dist-v2.1.0"
+      "output": "dist-v2.1.1"
     },
     "files": [
       "dist/**/*",
@@ -83,7 +85,8 @@
     "react-dom": "^19.1.1",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
-    "vite": "^7.1.5"
+    "vite": "^7.1.5",
+    "rimraf": "^5.0.5"
   },
   "dependencies": {
     "@types/react-router-dom": "^5.3.3",
