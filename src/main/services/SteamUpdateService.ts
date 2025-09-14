@@ -390,6 +390,60 @@ export class SteamUpdateService extends EventEmitter {
   }
 
   /**
+   * Retrieve the current build ID for a specific branch via Steam (node-steam-user)
+   * @param branchKey Steam branch key (e.g., 'public', 'beta', 'alternate', 'alternate-beta')
+   */
+  public async getBranchBuildId(branchKey: string): Promise<string | null> {
+    if (!this.isConnected) {
+      throw new Error('Steam Update Service not connected');
+    }
+
+    return new Promise((resolve, reject) => {
+      this.steamUser.getProductInfo([this.SCHEDULE_I_APP_ID], [], false, (err: Error | null, apps: any) => {
+        if (err) {
+          reject(new Error(`Failed to get product info: ${err.message}`));
+          return;
+        }
+
+        const app = apps[this.SCHEDULE_I_APP_ID];
+        if (!app || !app.appinfo) {
+          resolve(null);
+          return;
+        }
+        const branches = app.appinfo?.depots?.branches || {};
+        const info = branches[branchKey];
+        const buildId = info?.buildid ? String(info.buildid) : null;
+        resolve(buildId);
+      });
+    });
+  }
+
+  /**
+   * Retrieve all known branch build IDs
+   */
+  public async getAllBranchBuildIds(): Promise<Record<string, string>> {
+    if (!this.isConnected) {
+      throw new Error('Steam Update Service not connected');
+    }
+    return new Promise((resolve, reject) => {
+      this.steamUser.getProductInfo([this.SCHEDULE_I_APP_ID], [], false, (err: Error | null, apps: any) => {
+        if (err) {
+          reject(new Error(`Failed to get product info: ${err.message}`));
+          return;
+        }
+        const app = apps[this.SCHEDULE_I_APP_ID];
+        const out: Record<string, string> = {};
+        const branches = app?.appinfo?.depots?.branches || {};
+        for (const k of Object.keys(branches)) {
+          const id = branches[k]?.buildid;
+          if (id != null) out[k] = String(id);
+        }
+        resolve(out);
+      });
+    });
+  }
+
+  /**
    * Gets the current connection status
    *
    * @returns True if connected to Steam

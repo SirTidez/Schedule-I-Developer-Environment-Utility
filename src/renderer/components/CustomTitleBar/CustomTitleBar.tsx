@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useUpdateService } from '../../hooks/useUpdateService';
 
 interface CustomTitleBarProps {
   title?: string;
@@ -6,6 +7,7 @@ interface CustomTitleBarProps {
 
 export const CustomTitleBar: React.FC<CustomTitleBarProps> = ({ title = "Schedule I Developer Environment" }) => {
   const [isMaximized, setIsMaximized] = useState(false);
+  const { currentVersion, getCurrentVersion } = useUpdateService();
 
   useEffect(() => {
     // Check initial maximized state
@@ -19,6 +21,8 @@ export const CustomTitleBar: React.FC<CustomTitleBarProps> = ({ title = "Schedul
     };
 
     checkMaximized();
+    // Ensure version is loaded for the title bar
+    getCurrentVersion().catch(() => {/* non-fatal */});
 
     // Listen for window state changes
     const handleResize = () => {
@@ -67,6 +71,9 @@ export const CustomTitleBar: React.FC<CustomTitleBarProps> = ({ title = "Schedul
       <div className="flex items-center space-x-2">
         <div className="w-4 h-4 bg-blue-500 rounded-sm"></div>
         <span className="text-sm font-medium">{title}</span>
+        {currentVersion && (
+          <span className="text-xs text-gray-300">v{currentVersion}</span>
+        )}
       </div>
 
       {/* Window Controls */}

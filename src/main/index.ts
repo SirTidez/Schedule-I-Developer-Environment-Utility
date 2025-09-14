@@ -12,7 +12,7 @@
  * - Configure security settings
  */
 
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeImage } from 'electron';
 import * as path from 'path';
 import { setupSteamHandlers } from './ipc/steamHandlers';
 import { setupConfigHandlers } from './ipc/configHandlers';
@@ -29,8 +29,16 @@ import { ConfigService } from './services/ConfigService';
 import { setupCredentialCacheHandlers } from './ipc/credentialCacheHandlers';
 import { LoggingService } from './services/LoggingService';
 import { UpdateService } from './services/UpdateService';
+import { registerMelonLoaderHandlers } from './ipc/melonLoaderHandlers';
 
 const isDev = process.env.NODE_ENV === 'development';
+
+// Ensure Windows taskbar displays correct app name and icon
+try {
+  app.setName('Schedule I Developer Environment');
+  // Set AppUserModelId before creating any windows (Windows taskbar grouping & tooltip)
+  app.setAppUserModelId('com.schedulei.dev-environment');
+} catch {}
 
 // Initialize core services
 const configService = new ConfigService();
@@ -73,11 +81,11 @@ const updateService = new UpdateService(loggingService, configService.getConfigD
  */
 function createWindow(): void {
   // Get the icon path for both development and production
-  const iconPath = isDev 
-    ? path.join(__dirname, '../../Assets/icon.png')
-    : path.join(__dirname, '../../Assets/icon.png');
+  const iconPath = path.join(__dirname, '../../Assets/icon.png');
+  const appIcon = nativeImage.createFromPath(iconPath);
   
   // Create the browser window with custom configuration
+  const versionLabel = updateService.getCurrentVersion();
   const mainWindow = new BrowserWindow({
     width: 1000,
     height: 700,
@@ -90,8 +98,8 @@ function createWindow(): void {
       contextIsolation: true, // Security: enable context isolation
       preload: path.join(__dirname, '../preload/index.js'), // Secure API exposure
     },
-    icon: iconPath,
-    title: `Schedule I Developer Environment v${app.getVersion()}`,
+    icon: appIcon,
+    title: `Schedule I Developer Environment v${versionLabel}`,
     show: false, // Don't show until ready
   });
 
@@ -148,6 +156,7 @@ app.whenReady().then(() => {
   registerUpdateHandlers(updateService, loggingService); // Update checking
   registerShellHandlers(loggingService); // External URL opening
   registerWindowHandlers(loggingService); // Window management
+  registerMelonLoaderHandlers(loggingService); // MelonLoader download/extract
 
   // Create the main application window
   createWindow();

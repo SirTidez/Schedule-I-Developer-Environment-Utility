@@ -44,6 +44,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
   const [filesCopied, setFilesCopied] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
   const [downloadMethod, setDownloadMethod] = useState<'copy' | 'depotdownloader'>('copy');
+  const cancelledRef = useRef(false);
   const [effectiveCreds, setEffectiveCreds] = useState<null | { username: string; password: string; stayLoggedIn: boolean }>(steamCredentials);
   const [branchLogLines, setBranchLogLines] = useState<string[]>([]);
   const [branchLogStart, setBranchLogStart] = useState<Date | null>(null);
@@ -137,43 +138,107 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
         return;
       }
       if (evt.data) {
-        const line = String(evt.data).trim();
-        if (line.length > 0) addTerminalLog(`[DepotDownloader] ${line}`);
+        const raw = String(evt.data);
+        const lines = raw.replace(/\r/g, '\n').split(/\n/);
+        for (const ln of lines) {
+          const line = ln.trim();
+          if (!line) continue;
+          const sanitized = line.replace(/\x1b\[[0-9;]*m/g, '');
+          addTerminalLog(`[DepotDownloader] ${sanitized}`);
 
-        // Try to parse percentage from DepotDownloader output formats
-        // Examples:
-        // - "Downloaded X MB / Y MB (Z%)"
-        // - "Downloading depot X of Y"
-        // - Completion messages
-        let parsedPercent: number | null = null;
+          // Parse percentage from sanitized text
+          let parsedPercent: number | null = null;
+          const percentMatch = sanitized.match(/\((\d+(?:\.\d+)?)%\)/);
+          if (percentMatch) parsedPercent = parseFloat(percentMatch[1]);
+          if (parsedPercent == null) {
+            const startPercent = sanitized.match(/^\s*(\d{1,3}(?:\.\d{1,2})?)%(?:\s|$)/);
+            if (startPercent) parsedPercent = parseFloat(startPercent[1]);
+            else {
+              const anyPercent = sanitized.match(/(\d+(?:\.\d+)?)%/);
+              if (anyPercent) parsedPercent = parseFloat(anyPercent[1]);
+            }
+          }
+          if (!parsedPercent) {
+            const depotMatch = sanitized.match(/Downloading depot (\d+) of (\d+)/);
+            if (depotMatch) {
+              const current = parseInt(depotMatch[1]);
+              const total = parseInt(depotMatch[2]);
+              if (total > 0) parsedPercent = Math.max(0, Math.min(100, (current / total) * 100));
+            }
+          }
+          if (/download.*complete|all.*depot.*downloaded/i.test(sanitized) || /total downloaded:/i.test(sanitized) || /^\s*100%(?:\s|$)/.test(sanitized)) parsedPercent = 100;
 
-        // Look for explicit percentage in parentheses
-        const percentMatch = line.match(/\((\d+(?:\.\d+)?)%\)/);
-        if (percentMatch) { parsedPercent = parseFloat(percentMatch[1]); addTerminalLog(`[Progress:parsed] ${parsedPercent.toFixed(1)}% (paren)`); }
-
-        // Fallback: any standalone percentage in the line (e.g., "12.34% path")
-        if (parsedPercent == null) {
-          const anyPercent = line.match(/\b(\d+(?:\.\d+)?)%\b/);
-          if (anyPercent) { parsedPercent = parseFloat(anyPercent[1]); addTerminalLog(`[Progress:parsed] ${parsedPercent.toFixed(1)}% (fallback)`); }
-        }
-
-        // Look for depot progress indicators
-        if (!parsedPercent) {
-          const depotMatch = line.match(/Downloading depot (\d+) of (\d+)/);
-          if (depotMatch) {
-            const current = parseInt(depotMatch[1]);
-            const total = parseInt(depotMatch[2]);
-            if (total > 0) { parsedPercent = Math.max(0, Math.min(100, (current / total) * 100)); addTerminalLog(`[Progress:parsed] ${parsedPercent.toFixed(1)}% (depot ${current}/${total})`); }
+          if (typeof parsedPercent === 'number' && !Number.isNaN(parsedPercent)) {
+            const clamped = Math.max(0, Math.min(100, parsedPercent));
+            setBranchProgress(prev => (clamped > prev ? clamped : prev));
           }
         }
+      }
+    };
+    window.electronAPI.onDepotDownloaderProgress(onDepotDownloader);
+    return () => {
+      window.electronAPI.removeDepotDownloaderProgressListener();
+    };
+  }, []);
+/*
+      if (evt.type === 'percent' && typeof evt.value === 'number') {
+        setBranchProgress(prev => (evt.value > prev ? evt.value : prev));
+        return;
+      }
+      if (evt.type === 'steam-guard' && evt.message) {
+        addTerminalLog(`[DepotDownloader] ${evt.message}`);
+        return;
+      }
+      if (evt.data) {
+        const raw = String(evt.data);
+        // Normalize carriage returns and split
+        const lines = raw.replace(/\r/g, '\n').split(/\n/);
+        for (const ln of lines) {
+          const line = ln.trim();
+          if (!line) continue;
+          // Strip ANSI color codes before parsing
+          const sanitized = line.replace(/\x1b\[[0-9;]*m/g, '');
+          addTerminalLog(`[DepotDownloader] ${sanitized}`);
 
-        // Check for completion messages
-        if (/download.*complete|all.*depot.*downloaded/i.test(line) || /total downloaded:/i.test(line)) { parsedPercent = 100; addTerminalLog('[Progress] 100% (completion)'); }
+          // Try to parse percentage from DepotDownloader output formats
+          // Examples:
+          // - "Downloaded X MB / Y MB (Z%)"
+          // - "Downloading depot X of Y"
+          // - Completion messages
+          let parsedPercent: number | null = null;
 
-        if (typeof parsedPercent === 'number' && !Number.isNaN(parsedPercent)) {
-          const clamped = Math.max(0, Math.min(100, parsedPercent));
-          // Only move forward
-          setBranchProgress(prev => (clamped > prev ? clamped : prev));
+          // Look for explicit percentage in parentheses
+          const percentMatch = sanitized.match(/\((\d+(?:\.\d+)?)%\)/);
+          if (percentMatch) { parsedPercent = parseFloat(percentMatch[1]); }
+
+          // Fallback: start-of-line or any standalone percentage in the line (e.g., "12.34% path")
+          if (parsedPercent == null) {
+            const startPercent = sanitized.match(/^\s*(\d{1,3}(?:\.\d{1,2})?)%(?:\s|$)/);
+            if (startPercent) { parsedPercent = parseFloat(startPercent[1]); }
+            else {
+              const anyPercent = sanitized.match(/(\d+(?:\.\d+)?)%/);
+              if (anyPercent) { parsedPercent = parseFloat(anyPercent[1]); }
+            }
+          }
+
+          // Look for depot progress indicators
+          if (!parsedPercent) {
+            const depotMatch = sanitized.match(/Downloading depot (\d+) of (\d+)/);
+            if (depotMatch) {
+              const current = parseInt(depotMatch[1]);
+              const total = parseInt(depotMatch[2]);
+              if (total > 0) { parsedPercent = Math.max(0, Math.min(100, (current / total) * 100)); }
+            }
+          }
+
+          // Check for completion messages
+          if (/download.*complete|all.*depot.*downloaded/i.test(sanitized) || /total downloaded:/i.test(sanitized) || /^\s*100%(?:\s|$)/.test(sanitized)) { parsedPercent = 100; }
+
+          if (typeof parsedPercent === 'number' && !Number.isNaN(parsedPercent)) {
+            const clamped = Math.max(0, Math.min(100, parsedPercent));
+            // Only move forward
+            setBranchProgress(prev => (clamped > prev ? clamped : prev));
+          }
         }
       }
     };
@@ -183,6 +248,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
     };
   }, []);
 
+*/
   const addTerminalLog = (message: string) => {
     setTerminalLogs(prev => [...prev, message]);
     setBranchLogLines(prev => [...prev, message]);
@@ -302,7 +368,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
         branchBuildIds: {},
         customLaunchCommands: {},
         lastUpdated: new Date().toISOString(),
-        configVersion: '2.0'
+        configVersion: '3.0'
       };
 
       // Update config through the service
@@ -392,6 +458,12 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
 
       // Process each branch (verification only for copy-based flow)
       for (let i = 0; i < selectedBranches.length; i++) {
+        if (cancelledRef.current) {
+          await closeSessionLog('cancelled');
+          setIsComplete(true);
+          setCopyStatus('completed');
+          return;
+        }
         const branch = selectedBranches[i];
         setCurrentBranch(branch);
         setCurrentBranchIndex(i);
@@ -417,8 +489,18 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
               await downloadBranchWithDepotDownloader(branch);
               await writeBranchLog(branch, 'success');
               await appendSessionLog(`[${new Date().toISOString()}] Downloaded ${branchDisplayNames[branch] || branch}: success`);
+              // Delay between branches to avoid auth/rate limits
+              await new Promise(res => setTimeout(res, 5000));
               proceed = true;
             } catch (e) {
+              if (cancelledRef.current) {
+                await writeBranchLog(branch, 'cancel');
+                await appendSessionLog(`[${new Date().toISOString()}] Downloaded ${branchDisplayNames[branch] || branch}: cancelled`);
+                await closeSessionLog('cancelled');
+                setIsComplete(true);
+                setCopyStatus('completed');
+                return;
+              }
               const errMsg = e instanceof Error ? e.message : String(e);
               await writeBranchLog(branch, 'failure');
               await appendSessionLog(`[${new Date().toISOString()}] Downloaded ${branchDisplayNames[branch] || branch}: failure - ${errMsg}`);
@@ -596,24 +678,43 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
         addTerminalLog(`✓ Successfully downloaded ${branchDisplayName} branch with DepotDownloader`);
         addTerminalLog(`Output: ${result.output}`);
         
-      // Get and save build ID (from DepotDownloader manifest)
-      addTerminalLog(`Getting build ID for ${branchDisplayName} branch from manifest...`);
-        const buildResp = await window.electronAPI.depotdownloader.getBranchBuildId(branchPath, appId);
-        const buildId = buildResp?.buildId as string | undefined;
-        if (buildResp.success && buildId) {
+      // Get and save build ID via node-steam-user for this branch key
+      addTerminalLog(`Getting build ID for ${branchDisplayName} branch from Steam...`);
+      try {
+        const steamBuildResp = await window.electronAPI.steamUpdate.getBranchBuildId(branchId);
+        const buildId = steamBuildResp?.success ? steamBuildResp.buildId : undefined;
+        if (buildId) {
           addTerminalLog(`Build ID for ${branchDisplayName}: ${buildId}`);
           await window.electronAPI.config.setBuildIdForBranch(branch, buildId);
           addTerminalLog(`✓ Saved build ID for ${branchDisplayName} branch`);
+          // Optionally mirror manifest for downstream tools
+          try {
+            const manifestPath = `${branchPath}/appmanifest_${appId}.acf`;
+            const manifest = `"AppState"\n{\n\t"appid"\t"${appId}"\n\t"Universe"\t"1"\n\t"name"\t"Schedule I"\n\t"StateFlags"\t"4"\n\t"installdir"\t"${branch}"\n\t"buildid"\t"${buildId}"\n\t"LastUpdated"\t"${Math.floor(Date.now()/1000)}"\n}`;
+            await window.electronAPI.file.writeText(manifestPath, manifest);
+            addTerminalLog(`✓ Wrote manifest to ${manifestPath}`);
+          } catch (e) {
+            addTerminalLog(`⚠ Failed to write manifest: ${e instanceof Error ? e.message : String(e)}`);
+          }
         } else {
           addTerminalLog(`⚠ Could not get build ID for ${branchDisplayName} branch`);
         }
+      } catch (e) {
+        addTerminalLog(`⚠ Error retrieving build ID: ${e instanceof Error ? e.message : String(e)}`);
+      }
 
-        if (buildResp && buildResp.success && buildId) {
-          const manifestPath = `${branchPath}/appmanifest_${appId}.acf`;
-          const manifest = `"AppState"\n{\n\t"appid"\t"${appId}"\n\t"Universe"\t"1"\n\t"name"\t"Schedule I"\n\t"StateFlags"\t"4"\n\t"installdir"\t"${branch}"\n\t"buildid"\t"${buildId}"\n\t"LastUpdated"\t"${Math.floor(Date.now()/1000)}"\n}`;
-          await window.electronAPI.file.writeText(manifestPath, manifest);
-          addTerminalLog(`� Wrote manifest to ${manifestPath}`);
+      // Install MelonLoader into the new branch root
+      try {
+        addTerminalLog('Installing MelonLoader into branch root...');
+        const res = await window.electronAPI.melonloader.install(branchPath);
+        if (res?.success) {
+          addTerminalLog('✓ MelonLoader installed');
+        } else {
+          addTerminalLog(`⚠ MelonLoader install failed${res?.error ? `: ${res.error}` : ''}`);
         }
+      } catch (e) {
+        addTerminalLog(`⚠ MelonLoader install error: ${e instanceof Error ? e.message : String(e)}`);
+      }
         setCompletedBranches(prev => [...prev, branch]);
       } else {
         throw new Error(result.error || 'DepotDownloader download failed');
@@ -654,6 +755,12 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
           }
           proceed = true;
         } catch (e) {
+          if (cancelledRef.current) {
+            await writeBranchLog(branch, 'cancel');
+            setIsComplete(true);
+            setCopyStatus('completed');
+            return;
+          }
           const errMsg = e instanceof Error ? e.message : String(e);
           await writeBranchLog(branch, 'failure');
           const decision = await showFailureDialog(`Failed to process ${branchDisplayNames[branch] || branch}`, errMsg);
@@ -737,6 +844,11 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
 
   return (
     <div className="space-y-6">
+      {cancelledRef.current && (
+        <div className="bg-yellow-900/30 border border-yellow-500/50 text-yellow-200 px-4 py-2 text-sm text-center">
+          Download cancelled. You can restart the setup when ready.
+        </div>
+      )}
       <div>
         <h3 className="text-lg font-semibold mb-2">Copying Files</h3>
         <p className="text-gray-300 mb-4">
@@ -776,9 +888,34 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
               {branchProgress.toFixed(1)}% complete
             </p>
             {downloadMethod === 'depotdownloader' && (
-              <p className="text-xs text-gray-500 text-center mt-1">
-                Download progress from DepotDownloader
-              </p>
+              <div className="flex items-center justify-center mt-1 space-x-3">
+                <p className="text-xs text-gray-500">Download progress from DepotDownloader</p>
+                <button
+                  className="text-xs text-red-300 hover:text-red-200"
+                  onClick={async () => {
+                    const ok = confirm('Cancel the current download?');
+                    if (!ok) return;
+                    try {
+                      addTerminalLog('Attempting to cancel DepotDownloader download...');
+                      cancelledRef.current = true;
+                      const res = await window.electronAPI.depotdownloader.cancel();
+                      if (res?.success) {
+                        addTerminalLog('✔ Cancelled DepotDownloader download');
+                        try { window.electronAPI.removeDepotDownloaderProgressListener(); } catch {}
+                        try { await closeSessionLog('cancelled'); } catch {}
+                        setIsComplete(true);
+                        setCopyStatus('completed');
+                      } else {
+                        addTerminalLog(`? Cancel failed${res?.error ? `: ${res.error}` : ''}`);
+                      }
+                    } catch (e) {
+                      addTerminalLog(`? Cancel error: ${e instanceof Error ? e.message : String(e)}`);
+                    }
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -793,36 +930,6 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
           >
             {showTerminal ? 'Hide' : 'Show'} Terminal Output
           </button>
-          {downloadMethod === 'depotdownloader' && (
-            <button
-              onClick={async () => {
-                try {
-                  addTerminalLog('Attempting to cancel DepotDownloader download...');
-                  const res = await window.electronAPI.depotdownloader.cancel();
-                  if (res?.success) {
-                    addTerminalLog('✔ Cancelled DepotDownloader download');
-                    // Attempt cleanup of current branch directory by default
-                    try {
-                      const branch = selectedBranches[currentBranchIndex];
-                      const branchPath = `${managedEnvironmentPath}/branches/${branch}`;
-                      addTerminalLog(`Cleaning branch directory: ${branchPath}`);
-                      await window.electronAPI.file.deleteDirectory(branchPath);
-                      addTerminalLog('✔ Cleaned branch directory after cancel');
-                    } catch (cleanErr) {
-                      addTerminalLog(`? Cleanup failed: ${cleanErr instanceof Error ? cleanErr.message : String(cleanErr)}`);
-                    }
-                  } else {
-                    addTerminalLog(`? Cancel failed${res?.error ? `: ${res.error}` : ''}`);
-                  }
-                } catch (e) {
-                  addTerminalLog(`? Cancel error: ${e instanceof Error ? e.message : String(e)}`);
-                }
-              }}
-              className="btn-danger text-sm ml-2"
-            >
-              Cancel Download
-            </button>
-          )}
         </div>
       )}
 

@@ -14,9 +14,11 @@ interface BranchInfo {
   buildId: number;
   lastUpdated: number;
   isInstalled: boolean;
+  needsRepair?: boolean;
   size: string;
   needsUpdate: boolean;
   steamBranchKey: string; // The actual Steam branch key (public, beta, alternative, alternative_beta)
+  remoteBuildId?: number;
 }
 
 const ManagedEnvironment: React.FC = () => {
@@ -35,12 +37,34 @@ const ManagedEnvironment: React.FC = () => {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [hideUpdateUntilNextRelease, setHideUpdateUntilNextRelease] = useState(false);
   const [hasCheckedForUpdates, setHasCheckedForUpdates] = useState(false);
-  const [showSteamLogin, setShowSteamLogin] = useState(false);
+  // Inline Steam login in the Steam Session card (no separate section)
   const [loginUser, setLoginUser] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginStatus, setLoginStatus] = useState<{ loggingIn: boolean; msg: string; err?: string; guard?: 'email'|'mobile'|null }>({ loggingIn: false, msg: '', guard: null });
   const [loginGuardCode, setLoginGuardCode] = useState('');
   const [cachedUser, setCachedUser] = useState<string | null>(null);
+  const [ddPercent, setDdPercent] = useState<number>(0);
+  const [ddActive, setDdActive] = useState<boolean>(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const handleCancelDepotDownload = async (branch: BranchInfo) => {
+    try {
+      const res = await window.electronAPI.depotdownloader.cancel();
+      // Best-effort cleanup of partially downloaded directory
+      try { await window.electronAPI.file.deleteDirectory(branch.path); } catch {}
+      if (!res?.success) {
+        console.warn('DepotDownloader cancel reported failure', res?.error);
+      }
+    } catch (e) {
+      console.warn('DepotDownloader cancel threw error', e);
+    } finally {
+      try { window.electronAPI.removeDepotDownloaderProgressListener(); } catch {}
+      setDdActive(false);
+      setDdPercent(0);
+      setInstallingBranch(null);
+      // Refresh branches to reflect state
+      try { await loadBranches(); } catch {}
+    }
+  };
 
   useEffect(() => {
     if (config) {
@@ -107,36 +131,42 @@ const ManagedEnvironment: React.FC = () => {
 
       const branchInfos: BranchInfo[] = [];
 
-      // Get current Steam build ID and branch key for comparison
-      let currentSteamBuildId = '';
+      // Fetch latest branch build IDs via Steam (node-steam-user)
+      let latestBranchBuilds: Record<string, string> = {};
       let currentSteamBranchKey = '';
       try {
-        currentSteamBuildId = await getCurrentSteamBuildId(config.steamLibraryPath);
+        const latest = await window.electronAPI.steamUpdate.getAllBranchBuildIds();
+        if (latest?.success && latest.map) {
+          latestBranchBuilds = latest.map;
+        }
         currentSteamBranchKey = await detectCurrentSteamBranchKey(config.steamLibraryPath) || '';
-        console.log(`Current Steam build ID: ${currentSteamBuildId}`);
-        console.log(`Current Steam branch key: ${currentSteamBranchKey}`);
       } catch (err) {
-        console.warn('Could not get current Steam build ID or branch key:', err);
+        console.warn('Could not fetch latest branch build IDs or current branch:', err);
       }
 
       for (const branch of allBranches) {
         const branchPath = `${config.managedEnvironmentPath}\\branches\\${branch.folderName}`;
-        const isInstalled = await checkFileExists(branchPath);
-        
-        // Check if this branch matches the currently installed Steam branch
-        const isCurrentSteamBranch = currentSteamBranchKey === branch.steamBranchKey;
-        
+        const dirExists = await checkFileExists(branchPath);
+        const exePath = `${branchPath}\\Schedule I.exe`;
+        const exeExists = await checkFileExists(exePath);
+        const isInstalled = !!exeExists; // Only installed if executable exists
+        const needsRepair = !!dirExists && !exeExists; // Folder exists but exe missing
+
         // Get build ID from config if available
         const buildInfo = config.branchBuildIds[branch.folderName];
         const buildId = buildInfo ? parseInt(buildInfo.buildId) : 0;
         const lastUpdated = buildInfo ? new Date(buildInfo.updatedTime).getTime() / 1000 : Date.now() / 1000;
 
-        // Check if branch needs update
+        // Determine update status vs Steam (node-steam-user) for this branch key
         let needsUpdate = false;
-        if (currentSteamBuildId && buildId > 0) {
-          const currentBuildIdNum = parseInt(currentSteamBuildId);
-          needsUpdate = currentBuildIdNum > buildId;
-          console.log(`Branch ${branch.name}: stored=${buildId}, current=${currentBuildIdNum}, needsUpdate=${needsUpdate}`);
+        let remoteBuildIdNum: number | undefined = undefined;
+        const remoteBuildStr = latestBranchBuilds[branch.steamBranchKey] || '';
+        if (remoteBuildStr) {
+          remoteBuildIdNum = parseInt(remoteBuildStr);
+          if (buildId > 0) {
+            needsUpdate = remoteBuildIdNum > buildId;
+            console.log(`Branch ${branch.name}: stored=${buildId}, remote=${remoteBuildIdNum}, needsUpdate=${needsUpdate}`);
+          }
         }
 
         branchInfos.push({
@@ -144,10 +174,12 @@ const ManagedEnvironment: React.FC = () => {
           path: branchPath,
           buildId: buildId,
           lastUpdated: lastUpdated,
-          isInstalled: isInstalled || isCurrentSteamBranch, // Mark as installed if folder exists OR it's the current Steam branch
-          size: (isInstalled || isCurrentSteamBranch) ? '2.5 GB' : 'Not installed',
+          isInstalled: isInstalled,
+          needsRepair: needsRepair,
+          size: isInstalled ? '2.5 GB' : (needsRepair ? 'Unknown' : 'Not installed'),
           needsUpdate: needsUpdate,
-          steamBranchKey: branch.steamBranchKey
+          steamBranchKey: branch.steamBranchKey,
+          remoteBuildId: remoteBuildIdNum
         });
       }
 
@@ -166,7 +198,87 @@ const ManagedEnvironment: React.FC = () => {
     setError(null);
 
     try {
-      // Navigate to copy progress with the specific branch
+      // If configured to use DepotDownloader and we have creds, use it directly
+      if (config.useDepotDownloader) {
+        const credRes = await window.electronAPI?.credCache?.get?.();
+        const creds = credRes?.success ? credRes.credentials : null;
+        if (creds && creds.username && creds.password) {
+          setDdActive(true);
+          setDdPercent(0);
+
+          // Ensure target directory exists
+          try { await window.electronAPI.file.createDirectory(branchInfo.path); } catch {}
+
+          // Wire up progress listener
+          const progressHandler = (p: any) => {
+            if (p?.type === 'percent' && typeof p.value === 'number') {
+              setDdPercent(Math.max(0, Math.min(100, p.value)));
+            }
+          };
+          window.electronAPI.onDepotDownloaderProgress(progressHandler);
+
+          try {
+            const appId = await window.electronAPI.steam.getScheduleIAppId();
+            if (!appId) throw new Error('Could not determine Schedule I App ID');
+
+            const ddPath = config.depotDownloaderPath || undefined;
+            const branchId = branchInfo.steamBranchKey; // already mapped (public/beta/alternate/alternate-beta)
+
+            const res = await window.electronAPI.depotdownloader.downloadBranch(
+              ddPath,
+              creds.username,
+              creds.password,
+              branchInfo.path,
+              appId,
+              branchId
+            );
+
+            if (!res?.success) {
+              throw new Error(res?.error || 'DepotDownloader failed');
+            }
+
+            // Fetch and store build ID via node-steam-user for the branch key
+            try {
+              const steamIdResp = await window.electronAPI.steamUpdate.getBranchBuildId(branchId);
+              const buildId = steamIdResp?.success ? steamIdResp.buildId : undefined;
+              const folderName = branchInfo.path.split('\\').pop() || branchInfo.name.toLowerCase().replace(/\s+/g, '-');
+              if (buildId) {
+                await window.electronAPI.config.setBuildIdForBranch(folderName, buildId);
+              }
+            } catch {}
+
+            // Install MelonLoader into the branch root
+            try {
+              const mlRes = await window.electronAPI.melonloader.install(branchInfo.path);
+              if (mlRes?.success) {
+                setToastMsg('MelonLoader installed');
+                setTimeout(() => setToastMsg(null), 4000);
+              } else if (mlRes?.error) {
+                setToastMsg('MelonLoader install failed');
+                setTimeout(() => setToastMsg(null), 4000);
+              }
+            } catch (e) {
+              setToastMsg('MelonLoader install failed');
+              setTimeout(() => setToastMsg(null), 4000);
+            }
+
+            // Refresh UI
+            await loadConfig();
+            await loadBranches();
+          } finally {
+            try { window.electronAPI.removeDepotDownloaderProgressListener(); } catch {}
+            setDdActive(false);
+            setDdPercent(0);
+          }
+
+          setInstallingBranch(null);
+          setToastMsg('Download cancelled');
+          setTimeout(() => setToastMsg(null), 4000);
+          return;
+        }
+      }
+
+      // Fallback: navigate to copy-based flow
       const branchData = {
         branchName: branchInfo.name,
         steamBranchKey: branchInfo.steamBranchKey,
@@ -175,14 +287,11 @@ const ManagedEnvironment: React.FC = () => {
         managedEnvironmentPath: config.managedEnvironmentPath,
         gameInstallPath: config.gameInstallPath
       };
-
-      // Store the branch data in session storage for the copy process
       sessionStorage.setItem('installBranchData', JSON.stringify(branchData));
-      
-      // Navigate to copy progress
       navigate('/copy-progress');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start installation');
+    } finally {
       setInstallingBranch(null);
     }
   };
@@ -367,6 +476,11 @@ const ManagedEnvironment: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
+      {toastMsg && (
+        <div className="bg-blue-900/30 border border-blue-500/50 text-blue-200 px-4 py-2 text-sm text-center">
+          {toastMsg}
+        </div>
+      )}
       <div className="container mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-6">
@@ -508,14 +622,17 @@ const ManagedEnvironment: React.FC = () => {
                         <div className="w-3 h-3 rounded-full bg-yellow-500" title="Update available"></div>
                       )}
                       <div className={`w-3 h-3 rounded-full ${
-                        branch.isInstalled ? 'bg-green-500' : 'bg-red-500'
-                      }`} title={branch.isInstalled ? 'Installed' : 'Not installed'}></div>
+                        branch.needsRepair ? 'bg-orange-500' : (branch.isInstalled ? 'bg-green-500' : 'bg-red-500')
+                      }`} title={branch.needsRepair ? 'Needs Repair' : (branch.isInstalled ? 'Installed' : 'Not installed')}></div>
                     </div>
                   </div>
                   
                   <div className="space-y-2 mb-4">
                     <p className="text-sm text-gray-400">
                       Build ID: <span className="text-gray-300">{branch.buildId || 'Unknown'}</span>
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Steam Build: <span className="text-gray-300">{branch.remoteBuildId ?? 'Unknown'}</span>
                     </p>
                     <p className="text-sm text-gray-400">
                       Last Updated: <span className="text-gray-300">
@@ -527,28 +644,52 @@ const ManagedEnvironment: React.FC = () => {
                     </p>
                     <p className="text-sm text-gray-400">
                       Status: <span className={`${
-                        branch.needsUpdate ? 'text-yellow-400' : 
-                        branch.isInstalled ? 'text-green-400' : 'text-red-400'
+                        branch.needsRepair ? 'text-orange-400' : (branch.needsUpdate ? 'text-yellow-400' : 
+                        branch.isInstalled ? 'text-green-400' : 'text-red-400')
                       }`}>
-                        {branch.needsUpdate ? 'Update Available' : 
-                         branch.isInstalled ? 'Installed' : 'Not Installed'}
+                        {branch.needsRepair ? 'Needs Repair' : (branch.needsUpdate ? 'Update Available' : 
+                         branch.isInstalled ? 'Installed' : 'Not Installed')}
                       </span>
                     </p>
                   </div>
 
                   <div className="space-y-2">
                     {!branch.isInstalled ? (
-                      <button
-                        onClick={() => handleInstallBranch(branch)}
-                        disabled={installingBranch === branch.name}
-                        className={`w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
-                          installingBranch === branch.name
-                            ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                            : 'bg-blue-600 hover:bg-blue-700 text-white'
-                        }`}
-                      >
-                        {installingBranch === branch.name ? 'Installing...' : 'Install'}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleInstallBranch(branch)}
+                          disabled={installingBranch === branch.name}
+                          className={`w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                            installingBranch === branch.name
+                              ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                              : 'bg-blue-600 hover:bg-blue-700 text-white'
+                          }`}
+                        >
+                          {installingBranch === branch.name ? 'Installing...' : (branch.needsRepair ? 'Repair' : 'Install')}
+                        </button>
+                        {installingBranch === branch.name && ddActive && (
+                          <div>
+                            <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                              <div className="h-1.5 bg-blue-600" style={{ width: `${ddPercent}%` }} />
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                              <div className="text-xs text-gray-400">{ddPercent.toFixed(0)}% downloading</div>
+                              <button
+                                className="text-xs text-red-300 hover:text-red-200"
+                                onClick={async () => {
+                                  const ok = confirm('Cancel the current download?');
+                                  if (!ok) return;
+                                  await handleCancelDepotDownload(branch);
+                                  setToastMsg('Download cancelled');
+                                  setTimeout(() => setToastMsg(null), 4000);
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <>
                         <div className="flex space-x-2">
@@ -561,7 +702,7 @@ const ManagedEnvironment: React.FC = () => {
                                 : 'bg-blue-600 hover:bg-blue-700 text-white'
                             }`}
                           >
-                            {installingBranch === branch.name ? 'Reinstalling...' : 'Reinstall'}
+                            {installingBranch === branch.name ? (branch.needsRepair ? 'Repairing...' : 'Reinstalling...') : (branch.needsRepair ? 'Repair' : 'Reinstall')}
                           </button>
                           <button
                             onClick={() => handleOpenBranchFolder(branch.path)}
@@ -583,15 +724,39 @@ const ManagedEnvironment: React.FC = () => {
                             </svg>
                           </button>
                         </div>
-                        <button
-                          onClick={() => handlePlayBranch(branch)}
-                          className="w-full py-2 px-4 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors flex items-center justify-center space-x-2"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M8 5v14l11-7z"/>
-                          </svg>
-                          <span>Play</span>
-                        </button>
+                        {installingBranch === branch.name && ddActive && (
+                          <div>
+                            <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                              <div className="h-1.5 bg-blue-600" style={{ width: `${ddPercent}%` }} />
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                              <div className="text-xs text-gray-400">{ddPercent.toFixed(0)}% downloading</div>
+                              <button
+                                className="text-xs text-red-300 hover:text-red-200"
+                                onClick={async () => {
+                                  const ok = confirm('Cancel the current download?');
+                                  if (!ok) return;
+                                  await handleCancelDepotDownload(branch);
+                                  setToastMsg('Download cancelled');
+                                  setTimeout(() => setToastMsg(null), 4000);
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {branch.isInstalled && !branch.needsRepair && (
+                          <button
+                            onClick={() => handlePlayBranch(branch)}
+                            className="w-full py-2 px-4 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors flex items-center justify-center space-x-2"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z"/>
+                            </svg>
+                            <span>Play</span>
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -633,28 +798,17 @@ const ManagedEnvironment: React.FC = () => {
         </div>
       </div>
 
-      {/* Steam Session */}
+      {/* Steam Session (with inline login when needed) */}
       <div className="card">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-xl font-semibold text-white">Steam Session</h2>
+          {cachedUser && (
+            <button className="btn-secondary" onClick={handleLogout}>Log out</button>
+          )}
         </div>
         {cachedUser ? (
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-300">Logged in as <span className="font-mono">{cachedUser}</span></p>
-            <button className="btn-secondary" onClick={handleLogout}>Log out</button>
-          </div>
+          <p className="text-sm text-gray-300">Logged in as <span className="font-mono">{cachedUser}</span></p>
         ) : (
-          <p className="text-sm text-gray-400">Not logged in</p>
-        )}
-      </div>
-
-      {/* Steam Login (DepotDownloader) */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-white">Steam Login (DepotDownloader)</h2>
-          <button onClick={() => setShowSteamLogin(v => !v)} className="btn-secondary text-sm">{showSteamLogin ? 'Hide' : 'Show'}</button>
-        </div>
-        {showSteamLogin && (
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
@@ -667,7 +821,9 @@ const ManagedEnvironment: React.FC = () => {
               </div>
             </div>
             {!loginStatus.guard && (
-              <button className="btn-primary" disabled={loginStatus.loggingIn || !loginUser || !loginPass} onClick={() => doDepotLogin()}> {loginStatus.loggingIn ? 'Logging in...' : 'Login'} </button>
+              <button className="btn-primary" disabled={loginStatus.loggingIn || !loginUser || !loginPass} onClick={() => doDepotLogin()}>
+                {loginStatus.loggingIn ? 'Logging in...' : 'Login'}
+              </button>
             )}
             {loginStatus.guard === 'email' && (
               <div className="flex items-center space-x-2">

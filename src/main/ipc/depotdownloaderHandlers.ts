@@ -419,7 +419,7 @@ async function handleDownloadBranch(event: any, depotDownloaderPath: string | un
         try {
           const cleaned = text.replace(/\x1b\[[0-9;]*m/g, '').replace(/\r/g, '\n');
           const firstLine = cleaned.split('\n')[0] || '';
-          const startMatch = firstLine.match(/^\s*(\d{1,3}(?:\.\d{1,2})?)%\b/);
+          const startMatch = firstLine.match(/^\s*(\d{1,3}(?:\.\d{1,2})?)%(?:\s|$)/);
           if (startMatch) return Math.max(0, Math.min(100, parseFloat(startMatch[1])));
 
           // DepotDownloader progress patterns:
@@ -432,7 +432,7 @@ async function handleDownloadBranch(event: any, depotDownloaderPath: string | un
           if (progressLabelMatch) return Math.max(0, Math.min(100, parseFloat(progressLabelMatch[1])));
 
           // Any standalone percentage in line (fallback)
-          const anyPercent = cleaned.match(/\b(\d+(?:\.\d+)?)%\b/);
+          const anyPercent = cleaned.match(/(\d+(?:\.\d+)?)%/);
           if (anyPercent) return Math.max(0, Math.min(100, parseFloat(anyPercent[1])));
 
           // "Downloading depot X of Y"
@@ -481,7 +481,6 @@ async function handleDownloadBranch(event: any, depotDownloaderPath: string | un
         const p = parseProgress(chunk);
         if (p != null) {
           latestPercent = p;
-          try { event?.sender?.send('depotdownloader-progress', { type: 'debug', message: `Parsed percent=${p} from: ${String(chunk).trim().slice(0,120)}` }); } catch {}
         }
         if (isError) errBuf += chunk; else outBuf += chunk;
         scheduleFlush();

@@ -19,6 +19,8 @@
  */
 
 import { app } from 'electron';
+import * as fs from 'fs';
+import * as path from 'path';
 import { LoggingService } from './LoggingService';
 import { UpdateCacheService } from './UpdateCacheService';
 
@@ -95,23 +97,59 @@ export class UpdateService {
    * Get the current application version from package.json
    */
   getCurrentVersion(): string {
-    const version = app.getVersion();
+    let version = app.getVersion();
     this.loggingService.info(`App version from app.getVersion(): "${version}"`);
-    
-    // Fallback to package.json version if app.getVersion() is empty
-    if (!version || version.trim() === '') {
+
+    const isPackaged = app.isPackaged;
+    const electronVersion = (process.versions && process.versions.electron) || '';
+    const looksLikeElectronVersion = version === electronVersion;
+
+    // Helper to read version from a package.json path
+    const readVersionFrom = (pkgPath: string): string | null => {
       try {
-        const packageJson = require('../../package.json');
-        const fallbackVersion = packageJson.version || '1.0.0';
-        this.loggingService.info(`Using fallback version from package.json: "${fallbackVersion}"`);
-        return fallbackVersion;
-      } catch (error) {
-        this.loggingService.error('Failed to read package.json for version fallback:', error as Error);
-        return '1.0.0'; // Ultimate fallback
+        if (fs.existsSync(pkgPath)) {
+          const pkgRaw = fs.readFileSync(pkgPath, 'utf-8');
+          const pkg = JSON.parse(pkgRaw);
+          if (pkg && typeof pkg.version === 'string' && pkg.version.trim()) {
+            this.loggingService.info(`Using package.json version from ${pkgPath}: "${pkg.version}"`);
+            return pkg.version.trim();
+          }
+        }
+      } catch (err) {
+        this.loggingService.error(`Failed reading version from ${pkgPath}`, err as Error);
       }
+      return null;
+    };
+
+    // In dev, or if Electron version leaked, prefer the application's package.json
+    if (!isPackaged || looksLikeElectronVersion || !version || version.trim() === '') {
+      // 1) app.getAppPath()/package.json
+      const fromAppPath = readVersionFrom(path.resolve(app.getAppPath(), 'package.json'));
+      if (fromAppPath) return fromAppPath;
+
+      // 2) repo root relative to compiled file (dist/main/services -> ../../../)
+      const fromRoot = readVersionFrom(path.resolve(__dirname, '../../../package.json'));
+      if (fromRoot) return fromRoot;
+
+      // 3) current working directory (when launched from project root)
+      const fromCwd = readVersionFrom(path.resolve(process.cwd(), 'package.json'));
+      if (fromCwd) return fromCwd;
+
+      // 4) Walk up a few levels from __dirname to find package.json
+      let walkDir = __dirname;
+      for (let i = 0; i < 5; i++) {
+        const candidate = path.resolve(walkDir, 'package.json');
+        const v = readVersionFrom(candidate);
+        if (v) return v;
+        walkDir = path.resolve(walkDir, '..');
+      }
+
+      this.loggingService.warn('Could not determine app version from package.json; falling back.');
     }
-    
-    return version;
+
+    // Packaged builds or as a last resort, trust app.getVersion if present
+    if (version && version.trim()) return version.trim();
+    return '1.0.0';
   }
 
   /**

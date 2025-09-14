@@ -86,7 +86,7 @@ export class ConfigService {
       branchBuildIds: {},
       customLaunchCommands: {},
       lastUpdated: new Date().toISOString(),
-      configVersion: '2.0',
+      configVersion: '3.0',
       useDepotDownloader: false,
       depotDownloaderPath: null,
       logRetentionCount: 50,
@@ -245,7 +245,7 @@ export class ConfigService {
     }
     
     // Check config version compatibility
-    if (config.configVersion && config.configVersion !== '2.0') {
+    if (config.configVersion && !['3.0'].includes(config.configVersion)) {
       warnings.push(`Config version ${config.configVersion} may not be fully compatible with current application`);
     }
     
@@ -279,7 +279,7 @@ export class ConfigService {
         branchBuildIds: config.branchBuildIds || {},
         customLaunchCommands: config.customLaunchCommands || {},
         lastUpdated: config.lastUpdated || new Date().toISOString(),
-        configVersion: config.configVersion || '2.0',
+        configVersion: config.configVersion || '3.0',
         useDepotDownloader: config.useDepotDownloader || false,
         depotDownloaderPath: config.depotDownloaderPath || null,
         logRetentionCount: typeof config.logRetentionCount === 'number' ? config.logRetentionCount : 50,

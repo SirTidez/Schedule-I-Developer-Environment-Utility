@@ -191,13 +191,16 @@ const SetupWizard: React.FC = () => {
               >
                 Previous
               </button>
-              <button 
-                className="btn-primary"
-                onClick={handleNext}
-                disabled={!canProceed()}
-              >
-                Next
-              </button>
+              {/* Hide Next on Steam Login step; login action progresses */}
+              {(currentStep !== 4 && currentStep !== 5) && (
+                <button 
+                  className="btn-primary"
+                  onClick={handleNext}
+                  disabled={!canProceed()}
+                >
+                  Next
+                </button>
+              )}
             </div>
           )}
         </div>

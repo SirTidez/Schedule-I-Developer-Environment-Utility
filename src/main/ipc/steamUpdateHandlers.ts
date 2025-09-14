@@ -320,6 +320,45 @@ class SteamUpdateHandlers {
       }
     });
 
+    // Get branch build ID via Steam (node-steam-user)
+    ipcMain.handle('steam-update:get-branch-buildid', async (event, branchKey: string) => {
+      try {
+        await this.initializeSteamService();
+        if (this.steamUpdateService && !this.steamUpdateService.isConnectedToSteam()) {
+          await this.steamUpdateService.connect();
+          // Give a brief moment for connection
+          await new Promise(res => setTimeout(res, 1500));
+        }
+        if (!this.steamUpdateService || !this.steamUpdateService.isConnectedToSteam()) {
+          throw new Error('Steam Update Service not connected');
+        }
+        const buildId = await this.steamUpdateService.getBranchBuildId(branchKey);
+        return { success: true, buildId };
+      } catch (error) {
+        await this.loggingService.error(`Failed to get branch build ID: ${error}`);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    });
+
+    // Get all branch build IDs
+    ipcMain.handle('steam-update:get-all-branch-buildids', async () => {
+      try {
+        await this.initializeSteamService();
+        if (this.steamUpdateService && !this.steamUpdateService.isConnectedToSteam()) {
+          await this.steamUpdateService.connect();
+          await new Promise(res => setTimeout(res, 1500));
+        }
+        if (!this.steamUpdateService || !this.steamUpdateService.isConnectedToSteam()) {
+          throw new Error('Steam Update Service not connected');
+        }
+        const map = await this.steamUpdateService.getAllBranchBuildIds();
+        return { success: true, map };
+      } catch (error) {
+        await this.loggingService.error(`Failed to get all branch build IDs: ${error}`);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    });
+
     this.loggingService.info('Steam Update IPC handlers registered successfully');
   }
 
