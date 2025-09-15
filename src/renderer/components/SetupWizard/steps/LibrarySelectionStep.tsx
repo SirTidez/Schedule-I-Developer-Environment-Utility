@@ -23,7 +23,6 @@ const LibrarySelectionStep: React.FC<LibrarySelectionStepProps> = ({
         try {
           const scheduleILibrary = await findScheduleILibrary();
           if (scheduleILibrary) {
-            console.log(`Auto-selecting library containing Schedule I: ${scheduleILibrary}`);
             setSelectedPath(scheduleILibrary);
             onLibrarySelected(scheduleILibrary);
             setAutoSelected(true);

@@ -30,8 +30,6 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
 }) => {
   // Map Steam branch keys to folder names for DepotDownloader
   const getBranchFolderName = (branchKey: string): string => {
-    console.log('VersionManagerDialog - branchKey received:', branchKey);
-    console.log('VersionManagerDialog - branchName received:', branchName);
     
     // Map Steam branch keys to folder names
     const branchFolderMap: Record<string, string> = {
@@ -42,7 +40,6 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
     };
     
     const folderName = branchFolderMap[branchKey] || branchKey;
-    console.log('VersionManagerDialog - mapped folder name:', folderName);
     return folderName;
   };
   const [userAddedVersions, setUserAddedVersions] = useState<VersionInfo[]>([]);
@@ -185,30 +182,18 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
 
     try {
       // Retrieve cached Steam credentials
-      console.log('Retrieving cached Steam credentials for version addition...');
-      console.log('Available electronAPI methods:', Object.keys(window.electronAPI || {}));
-      console.log('credCache available:', !!window.electronAPI?.credCache);
       
       const credResult = await window.electronAPI.credCache.get();
-      console.log('Credential cache result:', credResult);
-      console.log('credResult.success:', credResult?.success);
-      console.log('credResult.credentials:', credResult?.credentials);
       
       if (!credResult || !credResult.success || !credResult.credentials) {
-        console.log('No cached credentials found, showing error message');
         setError('Steam credentials not found. Please login to Steam first using the Steam login section in the main window, then try adding the version again.');
         return;
       }
 
       const { username, password } = credResult.credentials;
-      console.log('Using cached credentials for user:', username);
-      console.log('Password length:', password?.length || 0);
-      console.log('Username empty?', !username || username.trim() === '');
-      console.log('Password empty?', !password || password.trim() === '');
 
       // Get DepotDownloader path
       const depotPathResult = await window.electronAPI.depotdownloader.getDepotDownloaderPath();
-      console.log('DepotDownloader path result:', depotPathResult);
       
       if (!depotPathResult.success) {
         setError(`Failed to get DepotDownloader path: ${depotPathResult.error}`);
@@ -216,21 +201,11 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
       }
       
       const depotDownloaderPath = depotPathResult.path;
-      console.log('DepotDownloader path:', depotDownloaderPath);
 
       // Validate manifest ID first
       setError('Validating manifest ID...');
       const branchFolderName = getBranchFolderName(branchKey);
-      console.log('Using branch folder name:', branchFolderName);
-      console.log('Starting manifest validation with:', {
-        depotDownloaderPath,
-        username: username ? `${username.substring(0, 3)}***` : 'undefined',
-        password: password ? '***' : 'undefined',
-        manifestId: manifestId.trim(),
-        appId: '3164500',
-        depotId: '3164501',
-        steamBranchName
-      });
+      // Starting manifest validation
       
       const validationResult = await window.electronAPI.depotdownloader.validateManifest(
         depotDownloaderPath,
@@ -242,7 +217,6 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
         branchFolderName // Branch folder name
       );
       
-      console.log('Validation result:', validationResult);
 
       if (!validationResult.success) {
         setError(`Manifest validation failed: ${validationResult.error}`);
@@ -362,7 +336,6 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
       // Call the config service to set active build
       await window.electronAPI.config.setActiveBuild(branchName, buildId);
       setActiveVersion(buildId);
-      console.log('Calling onVersionChange with buildId:', buildId);
       onVersionChange({ buildId });
       
       // Refresh the versions list to update the UI
@@ -386,7 +359,6 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
       // Call the config service to set active manifest
       await window.electronAPI.config.setActiveManifest(branchName, manifestId);
       setActiveVersion(manifestId);
-      console.log('Calling onVersionChange with manifestId:', manifestId);
       onVersionChange({ manifestId });
       
       // Refresh the versions list to update the UI

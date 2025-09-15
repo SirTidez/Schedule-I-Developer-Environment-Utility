@@ -47,16 +47,13 @@ export class SteamService {
    */
   async detectSteamLibraries(): Promise<string[]> {
     try {
-      console.log('Detecting Steam libraries...');
       
       // Find Steam installation path
       const steamInstallPath = await this.findSteamInstallPath();
       if (!steamInstallPath) {
-        console.log('Steam installation not found');
         return [];
       }
       
-      console.log(`Found Steam installation at: ${steamInstallPath}`);
       
       const libraryPaths: string[] = [];
       const addedPaths = new Set<string>();
@@ -64,7 +61,6 @@ export class SteamService {
       // Read libraryfolders.vdf to find all libraries (including default)
       const libraryFoldersPath = path.join(steamInstallPath, 'steamapps', 'libraryfolders.vdf');
       if (await fs.pathExists(libraryFoldersPath)) {
-        console.log(`Reading library folders from: ${libraryFoldersPath}`);
         const content = await fs.readFile(libraryFoldersPath, 'utf-8');
         const allLibraries = this.parseLibraryFolders(content);
         
@@ -73,7 +69,6 @@ export class SteamService {
         if (await fs.pathExists(defaultLibrary)) {
           libraryPaths.push(defaultLibrary);
           addedPaths.add(defaultLibrary.toLowerCase());
-          console.log(`Added default library: ${defaultLibrary}`);
         }
         
         // Add additional libraries (avoiding duplicates)
@@ -84,7 +79,6 @@ export class SteamService {
           if (await fs.pathExists(steamAppsPath) && !addedPaths.has(normalizedPath)) {
             libraryPaths.push(steamAppsPath);
             addedPaths.add(normalizedPath);
-            console.log(`Added additional library: ${steamAppsPath}`);
           }
         }
       } else {
@@ -92,12 +86,10 @@ export class SteamService {
         const defaultLibrary = path.join(steamInstallPath, 'steamapps');
         if (await fs.pathExists(defaultLibrary)) {
           libraryPaths.push(defaultLibrary);
-          console.log(`Added default library (no libraryfolders.vdf): ${defaultLibrary}`);
         }
       }
       
       this.steamPaths = libraryPaths;
-      console.log(`Found ${libraryPaths.length} Steam libraries total`);
       
       return libraryPaths;
     } catch (error) {
@@ -380,24 +372,19 @@ export class SteamService {
   
   async detectInstalledBranch(libraryPath: string): Promise<string | null> {
     try {
-      console.log(`Detecting installed branch for library: ${libraryPath}`);
       
       const scheduleIAppId = SteamService.SCHEDULE_I_APP_ID;
       
       // libraryPath should already be the steamapps path, so we don't need to add 'steamapps' again
       const manifestPath = path.join(libraryPath, `appmanifest_${scheduleIAppId}.acf`);
       
-      console.log(`Looking for manifest at: ${manifestPath}`);
       
       if (!await fs.pathExists(manifestPath)) {
-        console.log(`Manifest not found at: ${manifestPath}`);
         return null;
       }
       
-      console.log(`Found manifest, parsing branch...`);
       const content = await fs.readFile(manifestPath, 'utf-8');
       const branch = this.parseBranchFromManifest(content);
-      console.log(`Detected branch: ${branch}`);
       
       return branch;
     } catch (error) {
@@ -408,24 +395,19 @@ export class SteamService {
 
   async detectCurrentSteamBranchKey(libraryPath: string): Promise<string | null> {
     try {
-      console.log(`Detecting current Steam branch key for library: ${libraryPath}`);
       
       const scheduleIAppId = SteamService.SCHEDULE_I_APP_ID;
       
       // libraryPath should already be the steamapps path, so we don't need to add 'steamapps' again
       const manifestPath = path.join(libraryPath, `appmanifest_${scheduleIAppId}.acf`);
       
-      console.log(`Looking for manifest at: ${manifestPath}`);
       
       if (!await fs.pathExists(manifestPath)) {
-        console.log(`Manifest not found at: ${manifestPath}`);
         return null;
       }
       
-      console.log(`Found manifest, parsing Steam branch key...`);
       const content = await fs.readFile(manifestPath, 'utf-8');
       const steamBranchKey = this.parseSteamBranchKey(content);
-      console.log(`Detected Steam branch key: ${steamBranchKey}`);
       
       return steamBranchKey;
     } catch (error) {
@@ -512,30 +494,24 @@ export class SteamService {
   
   async findScheduleIInLibraries(): Promise<string | null> {
     try {
-      console.log('Searching for Schedule I in all Steam libraries...');
       
       const libraries = await this.detectSteamLibraries();
       if (libraries.length === 0) {
-        console.log('No Steam libraries found');
         return null;
       }
       
       for (const libraryPath of libraries) {
-        console.log(`Checking library: ${libraryPath}`);
         
         // Check if Schedule I manifest exists in this library
         // libraryPath is already the steamapps path, so we don't need to add 'steamapps' again
         const manifestPath = path.join(libraryPath, `appmanifest_${SteamService.SCHEDULE_I_APP_ID}.acf`);
         
-        console.log(`Looking for Schedule I manifest at: ${manifestPath}`);
         
         if (await fs.pathExists(manifestPath)) {
-          console.log(`Found Schedule I in library: ${libraryPath}`);
           return libraryPath;
         }
       }
       
-      console.log('Schedule I not found in any Steam library');
       return null;
     } catch (error) {
       console.error('Error searching for Schedule I:', error);
@@ -548,14 +524,12 @@ export class SteamService {
       const games: any[] = [];
       
       if (!await fs.pathExists(libraryPath)) {
-        console.log(`Library path does not exist: ${libraryPath}`);
         return games;
       }
       
       const manifestFiles = await fs.readdir(libraryPath);
       const appManifestFiles = manifestFiles.filter(file => file.startsWith('appmanifest_') && file.endsWith('.acf'));
       
-      console.log(`Found ${appManifestFiles.length} app manifests in ${libraryPath}`);
       
       for (const manifestFile of appManifestFiles) {
         try {
@@ -605,12 +579,10 @@ export class SteamService {
   
   async verifyBranchInstalled(libraryPath: string, expectedBranch: string): Promise<boolean> {
     try {
-      console.log(`Verifying branch ${expectedBranch} is installed in library: ${libraryPath}`);
       
       const currentSteamBranchKey = await this.detectCurrentSteamBranchKey(libraryPath);
       const isCorrect = currentSteamBranchKey === expectedBranch;
       
-      console.log(`Expected Steam branch key: ${expectedBranch}, Current Steam branch key: ${currentSteamBranchKey}, Match: ${isCorrect}`);
       
       return isCorrect;
     } catch (error) {
@@ -623,18 +595,15 @@ export class SteamService {
     const startTime = Date.now();
     const checkInterval = 2000; // Check every 2 seconds
     
-    console.log(`Waiting for branch change to ${expectedBranch} in library: ${libraryPath}`);
     
     while (Date.now() - startTime < maxWaitTime) {
       try {
         const currentSteamBranchKey = await this.detectCurrentSteamBranchKey(libraryPath);
         
         if (currentSteamBranchKey === expectedBranch) {
-          console.log(`Branch successfully changed to ${expectedBranch}`);
           return true;
         }
         
-        console.log(`Current Steam branch key: ${currentSteamBranchKey}, waiting for: ${expectedBranch}`);
         await new Promise(resolve => setTimeout(resolve, checkInterval));
       } catch (error) {
         console.error('Error checking branch during wait:', error);
@@ -642,7 +611,6 @@ export class SteamService {
       }
     }
     
-    console.log(`Timeout waiting for branch change to ${expectedBranch}`);
     return false;
   }
 
@@ -652,14 +620,12 @@ export class SteamService {
       const manifestPath = path.join(libraryPath, `appmanifest_${SteamService.SCHEDULE_I_APP_ID}.acf`);
       
       if (!await fs.pathExists(manifestPath)) {
-        console.log(`Manifest not found for branch ${branchName}: ${manifestPath}`);
         return '';
       }
       
       // Read and parse the manifest directly
       const content = await fs.readFile(manifestPath, 'utf-8');
       const manifest = this.parseACFContent(content);
-      console.log(`Build ID for branch ${branchName}: ${manifest.buildId}`);
       return manifest.buildId.toString();
     } catch (error) {
       console.error(`Failed to get build ID for branch ${branchName}:`, error);
@@ -673,14 +639,12 @@ export class SteamService {
       const manifestPath = path.join(libraryPath, `appmanifest_${SteamService.SCHEDULE_I_APP_ID}.acf`);
       
       if (!await fs.pathExists(manifestPath)) {
-        console.log(`Steam manifest not found: ${manifestPath}`);
         return '';
       }
       
       // Read and parse the manifest directly
       const content = await fs.readFile(manifestPath, 'utf-8');
       const manifest = this.parseACFContent(content);
-      console.log(`Current Steam build ID: ${manifest.buildId}`);
       return manifest.buildId.toString();
     } catch (error) {
       console.error(`Failed to get current Steam build ID:`, error);

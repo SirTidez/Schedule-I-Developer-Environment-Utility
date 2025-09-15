@@ -20,7 +20,6 @@ const SummaryStep: React.FC<SummaryStepProps> = ({
   const handleOpenEnvironment = () => {
     // This would open the managed environment folder
     // In a real implementation, we'd use electron's shell API
-    console.log('Opening environment folder:', managedEnvironmentPath);
   };
 
   return (

@@ -43,13 +43,9 @@ import { getBranchVersionPath, getBranchVersionPathByManifest, ensureBranchVersi
 async function copyManifestContentsToBuildDirectory(manifestDirectory: string, buildDirectory: string): Promise<void> {
   try {
     if (!await fs.pathExists(manifestDirectory)) {
-      console.log('No manifest directory found, skipping copy');
       return;
     }
 
-    console.log(`Copying contents from manifest directory to build directory`);
-    console.log(`From: ${manifestDirectory}`);
-    console.log(`To: ${buildDirectory}`);
 
     // Ensure the build directory exists
     await fs.ensureDir(buildDirectory);
@@ -66,15 +62,12 @@ async function copyManifestContentsToBuildDirectory(manifestDirectory: string, b
       if (stat.isDirectory()) {
         // Copy directory recursively
         await fs.copy(sourcePath, targetPath);
-        console.log(`Copied directory: ${item}`);
       } else {
         // Copy file
         await fs.copyFile(sourcePath, targetPath);
-        console.log(`Copied file: ${item}`);
       }
     }
     
-    console.log('Manifest contents copy completed');
   } catch (error) {
     console.error('Error copying manifest contents:', error);
     throw error;
@@ -94,7 +87,6 @@ async function cleanupManifestDirectory(manifestDirectory: string): Promise<void
 
     // Always remove the manifest directory after copying contents to build directory
     await fs.remove(manifestDirectory);
-    console.log(`Cleaned up manifest directory: ${manifestDirectory}`);
   } catch (error) {
     console.warn('Failed to clean up manifest directory:', error);
   }
@@ -111,11 +103,9 @@ async function copyManifestFilesToBuildDirectory(buildDirectory: string): Promis
     const depotDownloaderDir = path.join(buildDirectory, '.DepotDownloader');
     
     if (!await fs.pathExists(depotDownloaderDir)) {
-      console.log('No .DepotDownloader directory found, skipping manifest copy');
       return;
     }
 
-    console.log('Copying manifest files from .DepotDownloader to build directory');
     
     // Read all files in the .DepotDownloader directory
     const manifestFiles = await fs.readdir(depotDownloaderDir);
@@ -128,14 +118,12 @@ async function copyManifestFilesToBuildDirectory(buildDirectory: string): Promis
       if (file.endsWith('.manifest') || file.endsWith('.json') || file.endsWith('.txt')) {
         try {
           await fs.copyFile(sourcePath, targetPath);
-          console.log(`Copied manifest file: ${file}`);
         } catch (error) {
           console.warn(`Failed to copy manifest file ${file}:`, error);
         }
       }
     }
     
-    console.log('Manifest files copy completed');
   } catch (error) {
     console.error('Error copying manifest files:', error);
     throw error;
@@ -250,7 +238,6 @@ async function resolveDepotDownloaderCommand(depotDownloaderPath?: string): Prom
  */
 async function handleValidateInstallation(event: any, depotDownloaderPath?: string): Promise<{success: boolean, error?: string, version?: string}> {
   try {
-    console.log('Validating DepotDownloader installation', depotDownloaderPath ? `at: ${depotDownloaderPath}` : '(from PATH/alias)');
 
     const trySpawnVersion = (cmd: string, args: string[], useShell: boolean) => new Promise<{ok: boolean, version?: string, output?: string}>(resolve => {
       const child = spawn(cmd, args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -332,7 +319,6 @@ async function handleValidateInstallation(event: any, depotDownloaderPath?: stri
  */
 async function handleLogin(event: any, depotDownloaderPath: string | undefined, username: string, password: string, options: any = {}): Promise<{success: boolean, error?: string, requiresSteamGuard?: boolean}> {
   try {
-    console.log('Testing Steam login with DepotDownloader for user:', username);
 
     // Check if Steam is running
     const steamProcess = await steamProcessService.detectSteamProcess();
@@ -393,7 +379,6 @@ async function handleLogin(event: any, depotDownloaderPath: string | undefined, 
               steamGuardType = 'mobile';
             }
 
-            console.log('Steam Guard authentication required', steamGuardType ? `(${steamGuardType})` : '');
             try {
               event.sender.send('depotdownloader-progress', {
                 type: 'steam-guard',
@@ -430,7 +415,6 @@ async function handleLogin(event: any, depotDownloaderPath: string | undefined, 
             fullOutput.includes('Logged in as')) {
           if (!loginCompleted) {
             loginCompleted = true;
-            console.log('DepotDownloader login successful');
             resolve({ success: true });
           }
         }
@@ -438,7 +422,6 @@ async function handleLogin(event: any, depotDownloaderPath: string | undefined, 
         // Check for login failure (DepotDownloader provides better error messages)
         if (fullOutput.includes('Login failed') || fullOutput.includes('Invalid password') ||
             fullOutput.includes('Invalid username') || fullOutput.includes('Access denied')) {
-          console.log('DepotDownloader login failed');
           resolve({
             success: false,
             error: 'Login failed: Invalid credentials or account access denied'
@@ -449,20 +432,17 @@ async function handleLogin(event: any, depotDownloaderPath: string | undefined, 
       depotDownloader.stdout.on('data', (data) => {
         const dataStr = data.toString();
         output += dataStr;
-        console.log('DepotDownloader output:', dataStr);
         checkOutput(dataStr);
       });
 
       depotDownloader.stderr.on('data', (data) => {
         const dataStr = data.toString();
         errorOutput += dataStr;
-        console.log('DepotDownloader error output:', dataStr);
         checkOutput(dataStr);
       });
 
       depotDownloader.on('close', (code) => {
         const fullOutput = output + errorOutput;
-        console.log('DepotDownloader login test completed with code:', code);
         currentLoginProc = null;
 
         if (!loginCompleted) {
@@ -474,7 +454,6 @@ async function handleLogin(event: any, depotDownloaderPath: string | undefined, 
             });
           } else if (code === 0) {
             // Success based on exit code
-            console.log('DepotDownloader login successful (detected on close)');
             resolve({ success: true });
           } else {
             resolve({
@@ -528,7 +507,6 @@ async function handleLogin(event: any, depotDownloaderPath: string | undefined, 
  */
 async function handleDownloadBranch(event: any, depotDownloaderPath: string | undefined, username: string, password: string, branchPath: string, appId: string, branchId: string, buildId?: string, depots?: Array<{depotId: string, manifestId: string}>): Promise<{success: boolean, error?: string}> {
   try {
-    console.log('Downloading branch with DepotDownloader:', branchId, 'to:', branchPath, buildId ? `(build: ${buildId})` : '');
 
     if (!username || !password || !branchPath || !appId || !branchId) {
       return { success: false, error: 'All parameters are required for branch download' };
@@ -546,9 +524,7 @@ async function handleDownloadBranch(event: any, depotDownloaderPath: string | un
       const isLegacy = await detectLegacyBranchStructure(branchBasePath);
       
       if (isLegacy) {
-        console.log('Detected legacy branch structure, migrating...');
         // For now, use the existing path but log the migration need
-        console.log('Legacy structure detected - migration needed for multi-version support');
       }
       
       await fs.ensureDir(branchPath);
@@ -573,7 +549,6 @@ async function handleDownloadBranch(event: any, depotDownloaderPath: string | un
 
       // If specific depots are provided, use depot and manifest arguments
       if (depots && depots.length > 0) {
-        console.log(`Using depot-specific download for ${depots.length} depots`);
         for (const depot of depots) {
           args.push('-depot', depot.depotId);
           args.push('-manifest', depot.manifestId);
@@ -602,7 +577,6 @@ async function handleDownloadBranch(event: any, depotDownloaderPath: string | un
       if (!steamProcess.isRunning) break;
       const waitMs = backoffs[Math.min(attempt, backoffs.length - 1)];
       const msg = `Steam is running; retrying in ${Math.round(waitMs/1000)}s...`;
-      console.log(msg);
       event?.sender?.send('depotdownloader-progress', { type: 'info', message: msg });
       await wait(waitMs);
       if (attempt === maxAttempts - 1) {
@@ -620,7 +594,6 @@ async function handleDownloadBranch(event: any, depotDownloaderPath: string | un
         maskedArgs.push(a);
       }
       const printable = [resolved.cmd, ...maskedArgs.map(a => (a.includes(' ') ? `"${a}"` : a))].join(' ');
-      console.log('Launching DepotDownloader:', printable);
       const depotDownloader = spawn(resolved.cmd, args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
       try { event?.sender?.send('depotdownloader-progress', { type: 'info', message: 'Launching DepotDownloader...' }); } catch {}
       currentDownloadProc = depotDownloader;
@@ -703,20 +676,17 @@ async function handleDownloadBranch(event: any, depotDownloaderPath: string | un
       depotDownloader.stdout.on('data', (data) => {
         const dataStr = data.toString();
         output += dataStr;
-        console.log('DepotDownloader output:', dataStr);
         handleChunk(dataStr, false);
       });
 
       depotDownloader.stderr.on('data', (data) => {
         const dataStr = data.toString();
         errorOutput += dataStr;
-        console.log('DepotDownloader error output:', dataStr);
         handleChunk(dataStr, true);
       });
 
       depotDownloader.on('close', async (code) => {
         const fullOutput = output + errorOutput;
-        console.log('DepotDownloader download completed with code:', code);
         currentDownloadProc = null;
 
         // Final flush to ensure last chunks are delivered
@@ -740,7 +710,6 @@ async function handleDownloadBranch(event: any, depotDownloaderPath: string | un
               // Clean up manifest directory
               await cleanupManifestDirectory(installDir);
               
-              console.log(`Successfully moved contents from manifest directory to build directory`);
             } else {
               // For regular downloads, copy manifest files from .DepotDownloader to main directory
               await copyManifestFilesToBuildDirectory(installDir);
@@ -766,7 +735,6 @@ async function handleDownloadBranch(event: any, depotDownloaderPath: string | un
       const waitMs = backoffs[Math.min(attempt, backoffs.length - 1)];
       if (waitMs > 0) {
         const msg = `Retrying download (attempt ${attempt+1}/${maxAttempts}) in ${Math.round(waitMs/1000)}s...`;
-        console.log(msg);
         event?.sender?.send('depotdownloader-progress', { type: 'info', message: msg });
         await wait(waitMs);
       }
@@ -812,7 +780,6 @@ async function handleDownloadBranch(event: any, depotDownloaderPath: string | un
  */
 async function handleDownloadBranchVersion(event: any, depotDownloaderPath: string | undefined, username: string, password: string, branchName: string, buildId: string, appId: string, branchId: string, managedEnvironmentPath: string): Promise<{success: boolean, error?: string}> {
   try {
-    console.log('Downloading branch version with DepotDownloader:', branchName, 'build:', buildId);
 
     if (!username || !password || !branchName || !buildId || !appId || !branchId || !managedEnvironmentPath) {
       return { success: false, error: 'All parameters are required for version download' };
@@ -845,7 +812,6 @@ async function handleDownloadBranchVersion(event: any, depotDownloaderPath: stri
       const depots = await steamService.getDepotManifestsForBuild(buildId);
       
       if (depots && depots.length > 0) {
-        console.log(`Using manifest-accurate download for build ${buildId} with ${depots.length} depots`);
         
         // Convert to the format expected by sequential depot download
         const depotList = depots.map(depot => ({
@@ -868,11 +834,9 @@ async function handleDownloadBranchVersion(event: any, depotDownloaderPath: stri
 
         return result;
       } else {
-        console.log(`No manifests available for build ${buildId}, falling back to generic download`);
       }
     } catch (manifestError) {
       console.warn(`Failed to get manifests for build ${buildId}:`, manifestError);
-      console.log(`Falling back to generic download for build ${buildId}`);
     }
 
     // Fall back to generic download if manifest resolution fails
@@ -895,7 +859,6 @@ async function handleDownloadBranchVersion(event: any, depotDownloaderPath: stri
  */
 async function handleMigrateLegacyBranch(event: any, branchPath: string, versionId: string, useManifestId: boolean = false): Promise<{success: boolean, error?: string}> {
   try {
-    console.log('Migrating legacy branch structure:', branchPath, 'to version:', versionId, 'useManifestId:', useManifestId);
 
     if (!branchPath || !versionId) {
       return { success: false, error: 'Branch path and version ID are required for migration' };
@@ -925,7 +888,6 @@ async function handleMigrateLegacyBranch(event: any, branchPath: string, version
  */
 async function handleDownloadBranchVersionByManifest(event: any, depotDownloaderPath: string | undefined, username: string, password: string, branchName: string, manifestId: string, appId: string, managedEnvironmentPath: string): Promise<{success: boolean, output?: string, error?: string}> {
   try {
-    console.log('Downloading branch version by manifest ID:', branchName, 'manifest:', manifestId);
 
     if (!username || !password || !branchName || !manifestId || !appId || !managedEnvironmentPath) {
       return { success: false, error: 'All parameters are required for manifest download' };
@@ -942,7 +904,6 @@ async function handleDownloadBranchVersionByManifest(event: any, depotDownloader
 
     // Use the existing manifest download handler
     const result = await handleDownloadWithManifest(event, depotDownloaderPath, username, password, branchName, manifestId, appId, '3164501', managedEnvironmentPath);
-    console.log('handleDownloadBranchVersionByManifest result:', { success: result.success, hasOutput: !!result.output, hasError: !!result.error });
     return result;
 
   } catch (error) {
@@ -961,7 +922,6 @@ async function handleDownloadBranchVersionByManifest(event: any, depotDownloader
  */
 async function handleGetBranchBuildId(event: any, branchPath: string, appId: string): Promise<{success: boolean, buildId?: string, manifestIds?: string[], error?: string}> {
   try {
-    console.log('Getting build ID and manifest IDs from DepotDownloader manifest at:', branchPath);
 
     if (!branchPath || !appId) {
       return { success: false, error: 'Branch path and App ID are required' };
@@ -992,7 +952,6 @@ async function handleGetBranchBuildId(event: any, branchPath: string, appId: str
 
           if (buildIdMatch) {
             buildId = buildIdMatch[1];
-            console.log('Found build ID in manifest:', buildId);
           }
         }
 
@@ -1005,7 +964,6 @@ async function handleGetBranchBuildId(event: any, branchPath: string, appId: str
           const manifestId = manifestIdMatch[1];
           if (!manifestIds.includes(manifestId)) {
             manifestIds.push(manifestId);
-            console.log('Found manifest ID in depot file:', manifestId);
           }
         }
       }
@@ -1020,7 +978,6 @@ async function handleGetBranchBuildId(event: any, branchPath: string, appId: str
           const buildIdMatch = data.match(/build[_\s]*id[^\d]*(\d+)/i);
           if (buildIdMatch) {
             buildId = buildIdMatch[1];
-            console.log('Found build ID in depot file:', buildId);
             break;
           }
         }
@@ -1055,7 +1012,6 @@ async function handleGetBranchBuildId(event: any, branchPath: string, appId: str
  */
 async function handleDownloadBranchWithManifests(event: any, depotDownloaderPath: string | undefined, username: string, password: string, branchPath: string, appId: string, branchId: string, buildId: string, depots: Array<{depotId: string, manifestId: string}>): Promise<{success: boolean, error?: string}> {
   try {
-    console.log('Downloading branch with specific manifests:', branchId, 'build:', buildId, 'depots:', depots.length);
 
     if (!username || !password || !branchPath || !appId || !branchId || !buildId || !depots || depots.length === 0) {
       return { success: false, error: 'All parameters including depots are required for manifest-specific download' };
@@ -1086,7 +1042,6 @@ async function handleDownloadBranchWithManifests(event: any, depotDownloaderPath
  */
 async function handleDownloadWithManifest(event: any, depotDownloaderPath: string | undefined, username: string, password: string, branchName: string, manifestId: string, appId: string, depotId: string, managedEnvironmentPath: string): Promise<{success: boolean, output?: string, error?: string}> {
   try {
-    console.log('Downloading with specific manifest:', manifestId, 'for branch:', branchName);
 
     if (!username || !password || !branchName || !manifestId || !appId || !depotId || !managedEnvironmentPath) {
       return { success: false, error: 'All parameters are required for manifest download' };
@@ -1122,7 +1077,6 @@ async function handleDownloadWithManifest(event: any, depotDownloaderPath: strin
     };
 
     const steamBranchKey = getSteamBranchKey(branchName);
-    console.log(`Using Steam branch key: ${steamBranchKey} for branch: ${branchName}`);
 
     // Build DepotDownloader arguments for specific manifest
     const args: string[] = [
@@ -1136,7 +1090,6 @@ async function handleDownloadWithManifest(event: any, depotDownloaderPath: strin
       '-max-downloads', '8'
     ];
 
-    console.log('Launching DepotDownloader with manifest-specific args:', args.map(a => a === password ? '***' : a).join(' '));
 
     return new Promise<{success: boolean, output?: string, error?: string}>((resolve) => {
       const depotDownloader = spawn(resolved.cmd, args, { 
@@ -1211,20 +1164,17 @@ async function handleDownloadWithManifest(event: any, depotDownloaderPath: strin
       depotDownloader.stdout.on('data', (data) => {
         const dataStr = data.toString();
         output += dataStr;
-        console.log('DepotDownloader output:', dataStr);
         handleChunk(dataStr, false);
       });
 
       depotDownloader.stderr.on('data', (data) => {
         const dataStr = data.toString();
         errorOutput += dataStr;
-        console.log('DepotDownloader error output:', dataStr);
         handleChunk(dataStr, true);
       });
 
       depotDownloader.on('close', async (code) => {
         const fullOutput = output + errorOutput;
-        console.log('DepotDownloader manifest download completed with code:', code);
         currentDownloadProc = null;
 
         // Final flush
@@ -1303,7 +1253,6 @@ async function handleDownloadWithManifest(event: any, depotDownloaderPath: strin
  */
 async function handleDownloadBranchSequentialDepots(event: any, depotDownloaderPath: string | undefined, username: string, password: string, branchPath: string, appId: string, branchId: string, buildId: string, depots: Array<{depotId: string, manifestId: string}>): Promise<{success: boolean, error?: string, completedDepots?: number}> {
   try {
-    console.log('Starting sequential depot download:', branchId, 'build:', buildId, 'depots:', depots.length);
 
     if (!username || !password || !branchPath || !appId || !branchId || !buildId || !depots || depots.length === 0) {
       return { success: false, error: 'All parameters including depots are required for sequential depot download' };
@@ -1334,7 +1283,6 @@ async function handleDownloadBranchSequentialDepots(event: any, depotDownloaderP
           });
         } catch {}
 
-        console.log(`Downloading depot ${depotNumber}/${totalDepots}: ${depot.depotId}`);
 
         // Download this specific depot
         const result = await handleDownloadBranch(event, depotDownloaderPath, username, password, branchPath, appId, branchId, buildId, [depot]);
@@ -1358,7 +1306,6 @@ async function handleDownloadBranchSequentialDepots(event: any, depotDownloaderP
           });
         } catch {}
 
-        console.log(`Successfully downloaded depot ${depotNumber}/${totalDepots}: ${depot.depotId}`);
 
       } catch (error) {
         console.error(`Error downloading depot ${depot.depotId}:`, error);
@@ -1378,7 +1325,6 @@ async function handleDownloadBranchSequentialDepots(event: any, depotDownloaderP
       });
     } catch {}
 
-    console.log(`Successfully completed sequential download of ${completedDepots} depots`);
     return { success: true, completedDepots };
 
   } catch (error) {
@@ -1407,7 +1353,6 @@ async function handleDownloadBranchSequentialDepots(event: any, depotDownloaderP
  */
 async function handleValidateManifest(event: any, depotDownloaderPath: string | undefined, username: string, password: string, manifestId: string, appId: string, depotId: string, branchName: string): Promise<{success: boolean, error?: string, manifestInfo?: any}> {
   try {
-    console.log(`Validating manifest ${manifestId} for app ${appId}, depot ${depotId}`);
 
     // Find DepotDownloader executable
     const depotDownloaderExe = await findDepotDownloaderExecutable(depotDownloaderPath);
@@ -1439,7 +1384,6 @@ async function handleValidateManifest(event: any, depotDownloaderPath: string | 
       }
       return arg;
     });
-    console.log(`Running DepotDownloader validation: ${depotDownloaderExe} ${maskedArgs.join(' ')}`);
 
     return new Promise((resolve) => {
       const proc = spawn(depotDownloaderExe, args, {
@@ -1459,9 +1403,6 @@ async function handleValidateManifest(event: any, depotDownloaderPath: string | 
       });
 
       proc.on('close', (code) => {
-        console.log(`DepotDownloader validation exited with code ${code}`);
-        console.log(`stdout: ${stdout}`);
-        console.log(`stderr: ${stderr}`);
 
         // Check if validation was successful
         if (code === 0 || stdout.includes('Depot download complete') || stdout.includes('Manifest found')) {
@@ -1546,7 +1487,6 @@ async function handleDownloadManifests(
   managedEnvironmentPath: string
 ): Promise<{ success: boolean; manifests?: Record<string, { manifestId: string; buildId: string }>; error?: string }> {
   try {
-    console.log(`Downloading manifests for branches: ${branches.join(', ')}`);
 
     // Find DepotDownloader executable
     const resolved = await findDepotDownloaderExecutable(depotDownloaderPath);
@@ -1575,7 +1515,6 @@ async function handleDownloadManifests(
         continue;
       }
 
-      console.log(`Downloading manifest for branch: ${branch} (${branchId})`);
 
       // Create temporary directory for this branch's manifest
       const tempDir = path.join(os.tmpdir(), `depotdownloader_manifest_${branch}_${Date.now()}`);
@@ -1602,7 +1541,6 @@ async function handleDownloadManifests(
           }
           return arg;
         });
-        console.log(`Running DepotDownloader manifest download: ${resolved} ${maskedArgs.join(' ')}`);
 
         const result = await new Promise<{ success: boolean; manifestId?: string; buildId?: string; error?: string }>((resolve) => {
           const proc = spawn(resolved, args, {
@@ -1682,7 +1620,6 @@ async function handleDownloadManifests(
             manifestId: result.manifestId,
             buildId: result.buildId || ''
           };
-          console.log(`Successfully downloaded manifest for ${branch}: ${result.manifestId}`);
         } else {
           console.error(`Failed to download manifest for ${branch}: ${result.error}`);
         }
@@ -1697,8 +1634,6 @@ async function handleDownloadManifests(
       }
     }
 
-    console.log('handleDownloadManifests - returning manifests:', manifests);
-    console.log('handleDownloadManifests - manifests keys:', Object.keys(manifests));
     
     return {
       success: true,
@@ -1721,7 +1656,6 @@ async function handleDownloadManifests(
  * This function should be called during application initialization.
  */
 export function setupDepotDownloaderHandlers(): void {
-  console.log('Setting up DepotDownloader IPC handlers');
 
   // Validate DepotDownloader installation
   ipcMain.handle('depotdownloader:validate-installation', handleValidateInstallation);
@@ -1748,12 +1682,10 @@ export function setupDepotDownloaderHandlers(): void {
   ipcMain.handle('depotdownloader:cancel', async () => {
     try {
       if (currentDownloadProc) {
-        console.log('Cancelling DepotDownloader download process...');
         currentDownloadProc.kill();
         return { success: true };
       }
       if (currentLoginProc) {
-        console.log('Cancelling DepotDownloader login process...');
         currentLoginProc.kill();
         return { success: true };
       }
@@ -1799,5 +1731,4 @@ export function setupDepotDownloaderHandlers(): void {
     return await handleDownloadManifests(event, depotDownloaderPath, username, password, branches, appId, managedEnvironmentPath);
   });
 
-  console.log('DepotDownloader IPC handlers registered successfully');
 }

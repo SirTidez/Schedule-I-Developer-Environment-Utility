@@ -479,35 +479,29 @@ export class SteamUpdateService extends EventEmitter {
    */
   public async getAllBranchBuildIds(): Promise<Record<string, string>> {
     try {
-      console.log('[SteamUpdateService] getAllBranchBuildIds called');
       
       // Temporary bypass for testing - remove this after confirming fix works
       const BYPASS_CACHE = process.env.NODE_ENV === 'development' && process.env.BYPASS_STEAM_CACHE === 'true';
       if (BYPASS_CACHE) {
-        console.log('[SteamUpdateService] Cache bypassed for testing, using direct Steam API call');
         return await this.fetchAllBranchBuildIdsFromSteam();
       }
       
       // Check if we're already in a cache update to prevent infinite loops
       if (this.gameInfoCache && this.gameInfoCache.getCacheStats().isUpdating) {
-        console.log('[SteamUpdateService] Cache update in progress, using direct Steam API call');
         await this.loggingService.debug('Cache update in progress, using direct Steam API call');
         return await this.fetchAllBranchBuildIdsFromSteam();
       }
 
       // Use the cache to get branch build IDs
-      console.log('[SteamUpdateService] Getting branch build IDs from cache...');
       const cachedBuildIds = await this.gameInfoCache.getBranchBuildIds();
       
       // If cache has data, return it
       if (Object.keys(cachedBuildIds).length > 0) {
-        console.log('[SteamUpdateService] Returning cached data:', Object.keys(cachedBuildIds));
         await this.loggingService.debug(`Returning cached branch build IDs: ${Object.keys(cachedBuildIds).join(', ')}`);
         return cachedBuildIds;
       }
 
       // If cache is empty, fetch fresh data
-      console.log('[SteamUpdateService] Cache empty, fetching fresh data');
       await this.loggingService.debug('Cache empty, fetching fresh branch build IDs from Steam');
       return await this.fetchAllBranchBuildIdsFromSteam();
     } catch (error) {
@@ -638,8 +632,6 @@ export class SteamUpdateService extends EventEmitter {
         const appDepots = app.appinfo.depots || {};
 
         // Debug logging to help understand available branches
-        console.log(`[SteamUpdateService] Available branches: ${Object.keys(branches).join(', ')}`);
-        console.log(`[SteamUpdateService] Looking for branch: ${branchKey}`);
 
         if (!branchInfo) {
           const availableBranches = Object.keys(branches);
@@ -648,8 +640,6 @@ export class SteamUpdateService extends EventEmitter {
         }
 
         // Debug logging for depot structure
-        console.log(`[SteamUpdateService] App depots structure:`, Object.keys(appDepots));
-        console.log(`[SteamUpdateService] Branch info for ${branchKey}:`, branchInfo);
 
         // If buildId is provided, verify it matches the branch
         if (buildId && String(branchInfo.buildid) !== buildId) {

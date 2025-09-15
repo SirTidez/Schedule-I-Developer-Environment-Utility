@@ -54,7 +54,6 @@ function initializeSteamUpdateService(): SteamUpdateService {
  */
 async function handleGetDepotManifestsForBuild(event: any, buildId: string): Promise<{success: boolean, depots?: DepotInfo[], error?: string}> {
   try {
-    console.log('Getting depot manifests for build ID:', buildId);
 
     if (!buildId || typeof buildId !== 'string') {
       return { success: false, error: 'Build ID is required and must be a string' };
@@ -69,11 +68,9 @@ async function handleGetDepotManifestsForBuild(event: any, buildId: string): Pro
 
     const depots = await steamService.getDepotManifestsForBuild(buildId);
     
-    console.log(`Found ${depots.length} depots for build ${buildId}`);
     return { success: true, depots };
 
   } catch (error) {
-    console.error('Error getting depot manifests for build:', error);
     return {
       success: false,
       error: `Failed to get depot manifests: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -91,7 +88,6 @@ async function handleGetDepotManifestsForBuild(event: any, buildId: string): Pro
  */
 async function handleGetDepotManifestsForBranch(event: any, branchKey: string, buildId?: string): Promise<{success: boolean, depots?: DepotInfo[], error?: string}> {
   try {
-    console.log('Getting depot manifests for branch:', branchKey, buildId ? `(build: ${buildId})` : '');
 
     if (!branchKey || typeof branchKey !== 'string') {
       return { success: false, error: 'Branch key is required and must be a string' };
@@ -106,11 +102,9 @@ async function handleGetDepotManifestsForBranch(event: any, branchKey: string, b
 
     const depots = await steamService.getDepotManifestsForBranch(branchKey, buildId);
     
-    console.log(`Found ${depots.length} depots for branch ${branchKey}`);
     return { success: true, depots };
 
   } catch (error) {
-    console.error('Error getting depot manifests for branch:', error);
     return {
       success: false,
       error: `Failed to get depot manifests: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -127,7 +121,6 @@ async function handleGetDepotManifestsForBranch(event: any, branchKey: string, b
  */
 async function handleGetBranchBuildId(event: any, branchKey: string): Promise<{success: boolean, buildId?: string, error?: string}> {
   try {
-    console.log('Getting build ID for branch:', branchKey);
 
     if (!branchKey || typeof branchKey !== 'string') {
       return { success: false, error: 'Branch key is required and must be a string' };
@@ -146,11 +139,9 @@ async function handleGetBranchBuildId(event: any, branchKey: string): Promise<{s
       return { success: false, error: `No build ID found for branch ${branchKey}` };
     }
 
-    console.log(`Build ID for branch ${branchKey}: ${buildId}`);
     return { success: true, buildId };
 
   } catch (error) {
-    console.error('Error getting branch build ID:', error);
     return {
       success: false,
       error: `Failed to get branch build ID: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -166,7 +157,6 @@ async function handleGetBranchBuildId(event: any, branchKey: string): Promise<{s
  */
 async function handleGetAllBranchBuildIds(event: any): Promise<{success: boolean, buildIds?: Record<string, string>, error?: string}> {
   try {
-    console.log('Getting all branch build IDs');
 
     const steamService = initializeSteamUpdateService();
     
@@ -177,11 +167,9 @@ async function handleGetAllBranchBuildIds(event: any): Promise<{success: boolean
 
     const buildIds = await steamService.getAllBranchBuildIds();
     
-    console.log(`Found build IDs for ${Object.keys(buildIds).length} branches`);
     return { success: true, buildIds };
 
   } catch (error) {
-    console.error('Error getting all branch build IDs:', error);
     return {
       success: false,
       error: `Failed to get branch build IDs: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -204,7 +192,6 @@ async function handleGetAllBranchBuildIds(event: any): Promise<{success: boolean
  */
 async function handleGetRecentBuildsForBranch(event: any, branchKey: string, maxCount: number = 10): Promise<RecentBuildsResult> {
   try {
-    console.log(`Getting recent builds for branch: ${branchKey} (maxCount: ${maxCount})`);
 
     if (!branchKey || typeof branchKey !== 'string') {
       return { 
@@ -228,11 +215,9 @@ async function handleGetRecentBuildsForBranch(event: any, branchKey: string, max
 
     const result = await steamService.getRecentBuildsForBranch(branchKey, clampedMaxCount);
     
-    console.log(`Found ${result.actualCount} recent builds for branch ${branchKey} (history available: ${result.historyAvailable})`);
     return result;
 
   } catch (error) {
-    console.error('Error getting recent builds for branch:', error);
     return {
       success: false,
       error: `Failed to get recent builds: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -260,7 +245,6 @@ async function handleGetRecentBuildsForBranch(event: any, branchKey: string, max
  */
 async function handleListBranchBuilds(event: any, branchKey: string, maxCount: number = 10): Promise<Array<{buildId: string, date: string, sizeBytes?: number}>> {
   try {
-    console.log(`Listing branch builds for: ${branchKey} (maxCount: ${maxCount})`);
 
     if (!branchKey || typeof branchKey !== 'string') {
       throw new Error('Branch key is required and must be a string');
@@ -286,7 +270,6 @@ async function handleListBranchBuilds(event: any, branchKey: string, maxCount: n
     const builds = result.builds?.map(build => {
       // Validate buildId first
       if (!build.buildId || build.buildId === 'undefined' || build.buildId === 'null' || build.buildId === 'NaN' || isNaN(Number(build.buildId))) {
-        console.warn(`Invalid buildId detected: ${build.buildId}, skipping build`);
         return null;
       }
 
@@ -296,11 +279,9 @@ async function handleListBranchBuilds(event: any, branchKey: string, maxCount: n
         try {
           date = new Date(build.timeUpdated * 1000).toISOString();
         } catch (error) {
-          console.warn(`Invalid timestamp for build ${build.buildId}: ${build.timeUpdated}`);
           date = new Date().toISOString(); // Fallback to current time
         }
       } else {
-        console.warn(`Missing or invalid timeUpdated for build ${build.buildId}: ${build.timeUpdated}`);
         date = new Date().toISOString(); // Fallback to current time
       }
       
@@ -311,11 +292,9 @@ async function handleListBranchBuilds(event: any, branchKey: string, maxCount: n
       };
     }).filter(build => build !== null) || [];
 
-    console.log(`Converted ${builds.length} builds to simple array format for branch ${branchKey}`);
     return builds;
 
   } catch (error) {
-    console.error('Error listing branch builds:', error);
     // Return empty array on error to maintain UI stability
     return [];
   }
@@ -334,7 +313,6 @@ async function handleListBranchBuilds(event: any, branchKey: string, maxCount: n
  */
 async function handleGetInstalledVersions(event: any, branchName: string): Promise<Array<{buildId: string, manifestId: string, path: string, isActive: boolean, downloadDate: string, sizeBytes?: number, description?: string}>> {
   try {
-    console.log(`Getting installed versions for branch: ${branchName}`);
 
     if (!branchName || typeof branchName !== 'string') {
       throw new Error('Branch name is required and must be a string');
@@ -399,11 +377,9 @@ async function handleGetInstalledVersions(event: any, branchName: string): Promi
       };
     });
 
-    console.log(`Found ${versionsWithActiveFlag.length} installed versions for branch ${branchName}`);
     return versionsWithActiveFlag;
 
   } catch (error) {
-    console.error('Error getting installed versions:', error);
     // Return empty array on error to maintain UI stability
     return [];
   }
@@ -416,7 +392,6 @@ async function handleGetInstalledVersions(event: any, branchName: string): Promi
  * This function should be called during application initialization.
  */
 export function setupSteamBranchHandlers(steamUpdateServiceInstance: SteamUpdateService, configService: ConfigService, loggingServiceInstance: LoggingService): void {
-  console.log('Setting up Steam Branch IPC handlers');
 
   // Initialize services
   loggingService = loggingServiceInstance;
@@ -446,5 +421,4 @@ export function setupSteamBranchHandlers(steamUpdateServiceInstance: SteamUpdate
   // Get installed versions for a specific branch
   ipcMain.handle('steam:get-installed-versions', handleGetInstalledVersions);
 
-  console.log('Steam Branch IPC handlers registered successfully');
 }

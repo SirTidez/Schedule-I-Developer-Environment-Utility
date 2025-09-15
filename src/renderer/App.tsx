@@ -165,7 +165,6 @@ const AppContent: React.FC = () => {
 
   // Handle migration completion
   const handleMigrationComplete = (result: any) => {
-    console.log('Migration completed:', result);
     setShowMigrationDialog(false);
     setShouldShowManagedEnvironment(true);
   };

@@ -437,9 +437,6 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
         managedEnvironmentPath
       );
 
-      console.log('downloadManifestsForBranches - received result:', result);
-      console.log('downloadManifestsForBranches - result.success:', result.success);
-      console.log('downloadManifestsForBranches - result.manifests:', result.manifests);
 
       if (!result.success || !result.manifests) {
         throw new Error(result.error || 'Failed to download manifests');
@@ -453,8 +450,6 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
         addTerminalLog(`  ${branch}: manifest ${info.manifestId} (build ${info.buildId})`);
       }
 
-      console.log('downloadManifestsForBranches - result.manifests keys:', Object.keys(result.manifests));
-      console.log('downloadManifestsForBranches - result.manifests content:', result.manifests);
 
       return result.manifests;
 
@@ -467,10 +462,6 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
 
   const startCopyProcess = async (method: 'copy' | 'depotdownloader') => {
     try {
-      console.log('Starting copy process...');
-      console.log('Steam Library Path:', steamLibraryPath);
-      console.log('Managed Environment Path:', managedEnvironmentPath);
-      console.log('Selected Branches:', selectedBranches);
 
       // Disk space pre-check
       try {
@@ -554,8 +545,6 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
         setCopyStatus('downloading-manifests');
         try {
           manifests = await downloadManifestsForBranches(selectedBranches);
-          console.log('Downloaded manifests:', manifests);
-          console.log('Setting branchManifests state with keys:', Object.keys(manifests));
           setBranchManifests(manifests);
           addTerminalLog('✓ All manifests downloaded successfully');
         } catch (error) {
@@ -577,7 +566,6 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
         setCurrentBranch(branch);
         setCurrentBranchIndex(i);
         
-        console.log(`Processing branch: ${branch}`);
         
         // Calculate overall progress
         const branchProgress = ((i + 1) / selectedBranches.length) * 100;
@@ -634,7 +622,6 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
         // Copy-based flow
         if (i === 0) {
           // Skip verification for the first branch (currently installed)
-          console.log(`Skipping verification for first branch: ${branch}`);
           setCopyStatus('copying');
           let proceed = false;
           do {
@@ -664,7 +651,6 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
           } while (!proceed);
         } else {
           // For other branches, download with DepotDownloader first to get proper manifest ID
-          console.log(`Downloading branch ${branch} with DepotDownloader to get manifest ID`);
           setCopyStatus('copying');
           let proceed = false;
           do {
@@ -852,10 +838,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
       addTerminalLog(`App ID: ${appId}`);
 
       // Get manifest information from the pre-downloaded manifests
-      console.log('Looking for manifest info for branch:', branch);
       const manifestSource = manifests || branchManifests;
-      console.log('Available manifest keys:', Object.keys(manifestSource));
-      console.log('Manifest content:', manifestSource);
       const manifestInfo = manifestSource[branch];
       if (!manifestInfo) {
         throw new Error(`No manifest information found for ${branchDisplayName} branch (key: ${branch})`);
@@ -992,7 +975,6 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
 
   const handleBranchSkipped = () => {
     setShowVerificationDialog(false);
-    console.log(`Skipped branch: ${currentBranch}`);
     if (verificationResolve) {
       verificationResolve();
       setVerificationResolve(null);

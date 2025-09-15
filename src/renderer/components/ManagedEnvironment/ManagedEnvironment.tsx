@@ -56,6 +56,7 @@ const ManagedEnvironment: React.FC = () => {
   const [ddPercent, setDdPercent] = useState<number>(0);
   const [ddActive, setDdActive] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  
   const handleCancelDepotDownload = async (branch: BranchInfo) => {
     try {
       const res = await window.electronAPI.depotdownloader.cancel();
@@ -164,14 +165,6 @@ const ManagedEnvironment: React.FC = () => {
         const activeManifestId = config.activeManifestPerBranch?.[branch.folderName];
         const activeBuildId = config.activeBuildPerBranch?.[branch.folderName];
         const buildId = activeManifestId || activeBuildId || '';
-        
-        console.log(`Branch ${branch.folderName} active versions:`, {
-          activeManifestId,
-          activeBuildId,
-          buildId,
-          configActiveManifest: config.activeManifestPerBranch,
-          configActiveBuild: config.activeBuildPerBranch
-        });
         const lastUpdated = config.branchBuildIds[branch.folderName] ? new Date(config.branchBuildIds[branch.folderName].updatedTime).getTime() / 1000 : Date.now() / 1000;
         
         // Check for active version and executable in version-specific structure
@@ -212,20 +205,16 @@ const ManagedEnvironment: React.FC = () => {
             // DepotDownloader installation - skip build ID comparison for now
             // TODO: Implement manifest-based update detection if needed
             needsUpdate = false;
-            console.log(`Branch ${branch.name}: manifest-based installation, skipping build ID update check`);
           } else if (buildId && typeof buildId === 'string' && buildId.includes('/')) {
             // DepotDownloader timestamp format (MM/DD/YYYY HH:MM:SS) - skip comparison
             needsUpdate = false;
-            console.log(`Branch ${branch.name}: DepotDownloader timestamp format, skipping build ID update check`);
           } else if (buildId && typeof buildId === 'number' && buildId > 0) {
             // Copy installation - use numeric build ID comparison
             needsUpdate = remoteBuildIdNum > buildId;
-            console.log(`Branch ${branch.name}: stored=${buildId}, remote=${remoteBuildIdNum}, needsUpdate=${needsUpdate}`);
           } else if (buildId && typeof buildId === 'string' && !isNaN(Number(buildId))) {
             // String buildId that can be parsed as number
             const numericBuildId = Number(buildId);
             needsUpdate = remoteBuildIdNum > numericBuildId;
-            console.log(`Branch ${branch.name}: stored=${numericBuildId}, remote=${remoteBuildIdNum}, needsUpdate=${needsUpdate}`);
           }
         }
 
@@ -336,13 +325,6 @@ const ManagedEnvironment: React.FC = () => {
       if (!config.managedEnvironmentPath) throw new Error('Managed Environment path not available');
       
       const branches = [branchFolderName];
-      console.log(`[downloadBranchManifest] Input parameters:`, {
-        branchFolderName,
-        appId,
-        ddPath,
-        branches,
-        managedEnvironmentPath: config.managedEnvironmentPath
-      });
       
       const res = await window.electronAPI.depotdownloader.downloadManifests(
         ddPath || undefined,
@@ -353,14 +335,11 @@ const ManagedEnvironment: React.FC = () => {
         config.managedEnvironmentPath
       );
 
-      console.log(`[downloadBranchManifest] Raw response:`, res);
 
       if (!res.success || !res.manifests) {
         throw new Error(res?.error || 'Failed to download manifests');
       }
 
-      console.log(`[downloadBranchManifest] Successfully downloaded manifests for ${branchFolderName}:`, res.manifests);
-      console.log(`[downloadBranchManifest] Manifest keys:`, Object.keys(res.manifests));
       return res.manifests;
     } catch (err) {
       console.error('Failed to download manifests:', err);
@@ -401,27 +380,15 @@ const ManagedEnvironment: React.FC = () => {
             if (!creds) throw new Error("Credentials not available");
 
             if (!config.managedEnvironmentPath) throw new Error('Managed Environment path not available');
-
-            console.log("Starting DepotDownloader installation for branch:", branchInfo.name);
-            console.log("Branch info:", {
-              name: branchInfo.name,
-              folderName: branchInfo.folderName,
-              steamBranchKey: branchInfo.steamBranchKey
-            });
-            console.log("App ID:", appId);
             
             const ddPath = config.depotDownloaderPath || undefined;
             const branchId = branchInfo.steamBranchKey; // already mapped (public/beta/alternate/alternate-beta)
             
             // Download manifests first to get the latest manifest ID
-            console.log("Downloading manifests for branch:", branchInfo.folderName);
             const manifests = await downloadBranchManifest(branchInfo.folderName, appId, ddPath);
             
             // Get the manifest info for this branch
             const branchFolderName = branchInfo.folderName;
-            console.log(`Looking for manifest info for branch folder: ${branchFolderName}`);
-            console.log(`Available manifest keys:`, Object.keys(manifests));
-            console.log(`Full manifests object:`, manifests);
             
             const manifestInfo = manifests[branchFolderName];
             if (!manifestInfo) {
@@ -429,7 +396,6 @@ const ManagedEnvironment: React.FC = () => {
             }
             
             const { manifestId, buildId } = manifestInfo;
-            console.log(`Using manifest ID: ${manifestId} (build ${buildId}) for ${branchInfo.name} (folder: ${branchFolderName})`);
 
             // Download the branch using the manifest ID
             const res = await window.electronAPI.depotdownloader.downloadBranchVersionByManifest(
@@ -448,9 +414,7 @@ const ManagedEnvironment: React.FC = () => {
 
             // Set the active manifest for this branch after successful download
             try {
-              console.log(`Setting active manifest ${manifestId} for branch ${branchInfo.folderName}`);
               await window.electronAPI.config.setActiveManifest(branchInfo.folderName, manifestId);
-              console.log(`Successfully set active manifest for ${branchInfo.name}`);
             } catch (configErr) {
               console.warn(`Failed to set active manifest for ${branchInfo.name}:`, configErr);
             }
@@ -556,8 +520,6 @@ const ManagedEnvironment: React.FC = () => {
         executablePath = `${branchInfo.path}\\Schedule I.exe`;
       }
       
-      console.log('Launching game from:', executablePath);
-      console.log('Branch info:', branchInfo);
       
       // Check if the executable exists first
       const executableExists = await checkFileExists(executablePath);
@@ -568,7 +530,6 @@ const ManagedEnvironment: React.FC = () => {
       // Launch the game executable
       await window.electronAPI.shell.launchExecutable(executablePath);
       
-      console.log('Game launched successfully');
     } catch (error) {
       console.error('Failed to launch game:', error);
       setError(`Failed to launch game: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -590,8 +551,6 @@ const ManagedEnvironment: React.FC = () => {
       
       // Convert forward slashes to backslashes for Windows compatibility
       const normalizedPath = targetPath.replace(/\//g, '\\');
-      console.log('Opening folder:', normalizedPath);
-      console.log('Branch info:', branchInfo);
       
       // Check if the folder exists first
       const folderExists = await checkFileExists(normalizedPath);
@@ -600,7 +559,6 @@ const ManagedEnvironment: React.FC = () => {
       }
       
       await window.electronAPI.shell.openFolder(normalizedPath);
-      console.log('Folder opened successfully');
     } catch (error) {
       console.error('Failed to open folder:', error);
       setError(`Failed to open folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -689,14 +647,11 @@ const ManagedEnvironment: React.FC = () => {
     if (!selectedBranchForVersionManager) return;
     
     try {
-      console.log('Version change detected, refreshing ManagedEnvironment...', version);
       // The VersionManagerDialog already handles setting the active version
       // Refresh config first to get latest active version data
       await loadConfig();
-      console.log('Config refreshed, now refreshing branches...');
       // Then refresh branches to show updated active version
       await loadBranches();
-      console.log('ManagedEnvironment refresh completed');
     } catch (err) {
       console.error('Failed to refresh after version change:', err);
     }
@@ -704,7 +659,6 @@ const ManagedEnvironment: React.FC = () => {
 
   const handleLaunchBranch = (branchName: string) => {
     // This would launch the game from the specific branch
-    console.log('Launching branch:', branchName);
     // In a real implementation, this would launch the game executable
   };
 
