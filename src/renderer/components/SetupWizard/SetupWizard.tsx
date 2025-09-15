@@ -43,6 +43,7 @@ const SetupWizard: React.FC = () => {
   const [steamLibraryPath, setSteamLibraryPath] = useState('');
   const [managedEnvironmentPath, setManagedEnvironmentPath] = useState('');
   const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
+  const [branchDescriptions, setBranchDescriptions] = useState<Record<string, string>>({});
   const [useDepotDownloader, setUseDepotDownloader] = useState<boolean>(false);
   const [depotDownloaderPath, setDepotDownloaderPath] = useState<string | null>(null);
   const [steamCredentials, setSteamCredentials] = useState<{ username: string; password: string; stayLoggedIn: boolean } | null>(null);
@@ -106,7 +107,10 @@ const SetupWizard: React.FC = () => {
         return (
           <BranchSelectionStep
             steamLibraryPath={steamLibraryPath}
-            onBranchesSelected={setSelectedBranches}
+            onBranchesSelected={(branches, descriptions) => {
+              setSelectedBranches(branches);
+              setBranchDescriptions(descriptions || {});
+            }}
             selectedBranches={selectedBranches}
           />
         );
@@ -134,6 +138,7 @@ const SetupWizard: React.FC = () => {
             steamLibraryPath={steamLibraryPath}
             managedEnvironmentPath={managedEnvironmentPath}
             selectedBranches={selectedBranches}
+            branchDescriptions={branchDescriptions}
             onComplete={() => setCurrentStep(7)}
             useDepotDownloader={useDepotDownloader}
             depotDownloaderPath={depotDownloaderPath}

@@ -2,6 +2,23 @@
 
 All notable changes to the Schedule I Developer Environment Utility are documented in this file.
 
+## [2.2.0] - 2025-01-21
+
+### Added
+- **Custom Description Management**: Users can now add custom descriptions when installing branches via setup wizard
+- **Version Manager Enhancement**: Added edit functionality to modify custom descriptions for installed builds
+- **Persistent Storage**: Custom descriptions are saved in configuration and persist across sessions
+- **Enhanced User Experience**: Better version identification with user-friendly custom names
+
+### Changed
+- **Setup Wizard Flow**: BranchSelectionStep now includes custom description input fields
+- **Version Manager UI**: Added edit icons and inline editing for version descriptions
+- **Data Storage**: Enhanced version information storage to include custom descriptions
+
+### Fixed
+- **Description Persistence**: Fixed issue where custom descriptions were being overwritten during refresh operations
+- **Version Loading**: Improved version loading to properly merge filesystem and configuration data
+
 ## [2.1.1] - 2025-09-14
 
 ### Highlights
@@ -10,7 +27,7 @@ All notable changes to the Schedule I Developer Environment Utility are document
 - Automatic MelonLoader install after DepotDownloader downloads (safe OSS unzip)
 - Managed Environment UX: inline login, per-branch progress + cancel, repair status
 - Setup Wizard UX: clear Steam login messaging, restored Next on integration step, dedicated MelonLoader prompt
-- Version + packaging: v2.1.1, output to `dist-v2.1.1/`, cleaner prepackage
+- Version + packaging: v2.2.0, output to `dist-v2.2.0/`, cleaner prepackage
 
 ### Security
 
@@ -41,8 +58,8 @@ All notable changes to the Schedule I Developer Environment Utility are document
 
 ### Versioning & Packaging
 
-- App version: 2.1.1 (title bar and UI)
-- Output directory: `dist-v2.1.1/`
+- App version: 2.2.0 (title bar and UI)
+- Output directory: `dist-v2.2.0/`
 - Added `clean` and `prepackage` scripts to remove previous outputs and rebuild
 - Windows dev icon: uses `Assets/icon.ico` (fallback to PNG)
 - Log filename: `DD-MM-YYYY-HH-MM.log`

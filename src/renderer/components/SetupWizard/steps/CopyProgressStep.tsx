@@ -10,6 +10,7 @@ interface CopyProgressStepProps {
   steamLibraryPath: string;
   managedEnvironmentPath: string;
   selectedBranches: string[];
+  branchDescriptions?: Record<string, string>;
   onComplete: () => void;
   useDepotDownloader?: boolean;
   depotDownloaderPath?: string | null;
@@ -20,6 +21,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
   steamLibraryPath,
   managedEnvironmentPath,
   selectedBranches,
+  branchDescriptions = {},
   onComplete,
   useDepotDownloader = false,
   depotDownloaderPath = null,
@@ -713,12 +715,19 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
             await window.electronAPI.config.setActiveManifest(branchName, manifestInfo.manifestId);
             
             // Store the manifest version information
-            await window.electronAPI.config.setBranchManifestVersion(branchName, manifestInfo.manifestId, {
+            const versionInfo: any = {
               buildId: manifestInfo.buildId,
               downloadDate: new Date().toISOString(),
               sizeBytes: 0, // Size will be updated after actual download
               isActive: true
-            });
+            };
+
+            // Add custom description if provided
+            if (branchDescriptions[branchName]) {
+              versionInfo.description = branchDescriptions[branchName];
+            }
+
+            await window.electronAPI.config.setBranchManifestVersion(branchName, manifestInfo.manifestId, versionInfo);
             
             addTerminalLog(`✓ Set active manifest for ${branchName}: ${manifestInfo.manifestId}`);
           }
@@ -774,10 +783,28 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
       // Ensure the version directory exists
       await window.electronAPI.file.createDirectory(branchVersionPath);
       
-      // Save only build ID for copy operations
+      // Save build ID and custom description for copy operations
       await window.electronAPI.config.setBuildIdForBranch(branch, buildId);
       await window.electronAPI.config.setActiveBuild(branch, buildId);
-      addTerminalLog(`✓ Saved build ID and set as active version for ${branchDisplayName} branch`);
+      
+      // Store custom description if provided
+      if (branchDescriptions[branch]) {
+        const versionInfo: any = {
+          buildId: buildId,
+          downloadDate: new Date().toISOString(),
+          sizeBytes: 0, // Size will be updated after copy completion
+          isActive: true
+        };
+        
+        if (branchDescriptions[branch]) {
+          versionInfo.description = branchDescriptions[branch];
+        }
+        
+        await window.electronAPI.config.setBranchVersion(branch, buildId, versionInfo);
+        addTerminalLog(`✓ Saved build ID with custom description "${branchDescriptions[branch]}" for ${branchDisplayName} branch`);
+      } else {
+        addTerminalLog(`✓ Saved build ID and set as active version for ${branchDisplayName} branch`);
+      }
       
       try {
         if (appId) {

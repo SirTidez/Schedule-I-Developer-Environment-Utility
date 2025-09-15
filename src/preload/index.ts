@@ -317,7 +317,7 @@ declare global {
         // Multi-version branch support
         listBranchBuilds: (branchKey: string, maxCount: number) => Promise<Array<{ buildId: string; date: string; sizeBytes?: number }>>;
         getCurrentBranchBuildId: (branchKey: string) => Promise<string | null>;
-        getInstalledVersions: (branchName: string) => Promise<Array<{ buildId: string; manifestId: string; path: string; isActive: boolean; downloadDate: string; sizeBytes?: number }>>;
+        getInstalledVersions: (branchName: string) => Promise<Array<{ buildId: string; manifestId: string; path: string; isActive: boolean; downloadDate: string; sizeBytes?: number; description?: string }>>;
       };
     config: {
       get: () => Promise<any>;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Trash2, CheckCircle, Circle, Loader2, Plus, Info } from 'lucide-react';
+import { X, Download, Trash2, CheckCircle, Circle, Loader2, Plus, Info, Edit2, Save, X as XIcon } from 'lucide-react';
 
 interface VersionInfo {
   buildId: string;
@@ -60,6 +60,11 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
   const [description, setDescription] = useState('');
   const [addingVersion, setAddingVersion] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  
+  // State for editing descriptions
+  const [editingVersion, setEditingVersion] = useState<string | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+  const [savingDescription, setSavingDescription] = useState(false);
 
   // Load versions when dialog opens
   useEffect(() => {
@@ -76,6 +81,7 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
     try {
       const installed = await window.electronAPI.steam.getInstalledVersions(branchName);
       const manifestVersions = await window.electronAPI.config.getBranchManifestVersions(branchName);
+      const buildVersions = await window.electronAPI.config.getBranchVersions(branchName);
 
       const unifiedVersions = new Map<string, VersionInfo>();
 
@@ -111,6 +117,26 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
               isActive: v.isActive,
               path: v.path,
               description: v.description || `Manifest ${v.manifestId}`,
+              isUserAdded: false
+            });
+          }
+        });
+      }
+
+      // Merge with build-based versions from config
+      if (buildVersions && Object.keys(buildVersions).length > 0) {
+        Object.values(buildVersions).forEach((v: any) => {
+          const key = v.buildId;
+          if (key && !unifiedVersions.has(key)) {
+            unifiedVersions.set(key, {
+              buildId: v.buildId,
+              manifestId: v.buildId, // Use buildId as manifestId for build-based versions
+              downloadDate: v.downloadDate,
+              sizeBytes: v.sizeBytes || 0,
+              isInstalled: true, // A version from config is considered installed
+              isActive: v.isActive,
+              path: v.path,
+              description: v.description || `Build ${v.buildId}`,
               isUserAdded: false
             });
           }
@@ -388,6 +414,66 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
     }
   };
 
+  const handleStartEditDescription = (version: VersionInfo) => {
+    setEditingVersion(version.manifestId || version.buildId);
+    setEditDescription(version.description || '');
+  };
+
+  const handleCancelEditDescription = () => {
+    setEditingVersion(null);
+    setEditDescription('');
+  };
+
+  const handleSaveDescription = async (version: VersionInfo) => {
+    if (savingDescription) return;
+    
+    setSavingDescription(true);
+    try {
+      const versionKey = version.manifestId || version.buildId;
+      const newDescription = editDescription.trim();
+      
+      // Update the version info in the installed versions list
+      const updatedVersions = installedVersions.map(v => {
+        if ((v.manifestId === version.manifestId && v.manifestId) || 
+            (v.buildId === version.buildId && v.buildId)) {
+          return { ...v, description: newDescription };
+        }
+        return v;
+      });
+      setInstalledVersions(updatedVersions);
+      
+      // Save to config based on version type
+      if (version.manifestId && version.manifestId !== version.buildId) {
+        // Manifest-based version
+        await window.electronAPI.config.setBranchManifestVersion(branchName, version.manifestId, {
+          buildId: version.buildId,
+          downloadDate: version.downloadDate,
+          sizeBytes: version.sizeBytes,
+          isActive: version.isActive,
+          description: newDescription
+        });
+      } else {
+        // Build-based version
+        await window.electronAPI.config.setBranchVersion(branchName, version.buildId, {
+          buildId: version.buildId,
+          downloadDate: version.downloadDate,
+          sizeBytes: version.sizeBytes,
+          isActive: version.isActive,
+          description: newDescription
+        });
+      }
+      
+      setEditingVersion(null);
+      setEditDescription('');
+      setToastMsg('Description updated successfully!');
+      setTimeout(() => setToastMsg(null), 3000);
+    } catch (err) {
+      setError(`Failed to save description: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSavingDescription(false);
+    }
+  };
+
   const handleDeleteVersion = async (buildId: string) => {
     if (!confirm(`Are you sure you want to delete version ${buildId}?`)) return;
 
@@ -618,17 +704,73 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
                       ) : (
                         <Circle size={20} className="text-gray-400" />
                       )}
-                      <div>
-                        <div className="text-white font-medium">
-                          {version.manifestId ? `Manifest ${version.manifestId}` : (version.buildId ? `Build ${version.buildId}` : 'Unknown')}
-                          {version.isActive && <span className="text-green-400 ml-2">(Active)</span>}
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <div className="text-white font-medium">
+                            {version.manifestId ? `Manifest ${version.manifestId}` : (version.buildId ? `Build ${version.buildId}` : 'Unknown')}
+                            {version.isActive && <span className="text-green-400 ml-2">(Active)</span>}
+                          </div>
+                          <button
+                            onClick={() => handleStartEditDescription(version)}
+                            className="p-1 text-gray-400 hover:text-white transition-colors"
+                            title="Edit description"
+                          >
+                            <Edit2 size={14} />
+                          </button>
                         </div>
-                        <div className="text-gray-400 text-sm">
-                          {version.manifestId && version.manifestId !== version.buildId && (
-                            <span>Build: {version.buildId} • </span>
-                          )}
-                          {formatDate(version.downloadDate)} • {formatSize(version.sizeBytes)}
-                        </div>
+                        {editingVersion === (version.manifestId || version.buildId) ? (
+                          <div className="mt-2 flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={editDescription}
+                              onChange={(e) => setEditDescription(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleSaveDescription(version);
+                                } else if (e.key === 'Escape') {
+                                  handleCancelEditDescription();
+                                }
+                              }}
+                              placeholder="Enter custom description"
+                              className="flex-1 px-2 py-1 bg-gray-600 text-white text-sm rounded border border-gray-500 focus:border-blue-500 focus:outline-none"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleSaveDescription(version)}
+                              disabled={savingDescription}
+                              className="p-1 text-green-400 hover:text-green-300 disabled:opacity-50"
+                              title="Save description"
+                            >
+                              {savingDescription ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <Save size={14} />
+                              )}
+                            </button>
+                            <button
+                              onClick={handleCancelEditDescription}
+                              disabled={savingDescription}
+                              className="p-1 text-red-400 hover:text-red-300 disabled:opacity-50"
+                              title="Cancel editing"
+                            >
+                              <XIcon size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div>
+                            {version.description && (
+                              <div className="text-blue-300 text-sm font-medium">
+                                "{version.description}"
+                              </div>
+                            )}
+                            <div className="text-gray-400 text-sm">
+                              {version.manifestId && version.manifestId !== version.buildId && (
+                                <span>Build: {version.buildId} • </span>
+                              )}
+                              {formatDate(version.downloadDate)} • {formatSize(version.sizeBytes)}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

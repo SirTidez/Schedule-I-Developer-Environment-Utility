@@ -19,7 +19,7 @@
  * when historical data is unavailable.
  *
  * @author Schedule I Developer Environment Utility Team
- * @version 2.1.1
+ * @version 2.2.0
  */
 
 import { ipcMain } from 'electron';
@@ -330,9 +330,9 @@ async function handleListBranchBuilds(event: any, branchKey: string, maxCount: n
  *
  * @param event IPC event object
  * @param branchName The branch name to get installed versions for
- * @returns Promise<Array<{buildId: string, manifestId: string, path: string, isActive: boolean, downloadDate: string, sizeBytes?: number}>> Installed versions
+ * @returns Promise<Array<{buildId: string, manifestId: string, path: string, isActive: boolean, downloadDate: string, sizeBytes?: number, description?: string}>> Installed versions
  */
-async function handleGetInstalledVersions(event: any, branchName: string): Promise<Array<{buildId: string, manifestId: string, path: string, isActive: boolean, downloadDate: string, sizeBytes?: number}>> {
+async function handleGetInstalledVersions(event: any, branchName: string): Promise<Array<{buildId: string, manifestId: string, path: string, isActive: boolean, downloadDate: string, sizeBytes?: number, description?: string}>> {
   try {
     console.log(`Getting installed versions for branch: ${branchName}`);
 
@@ -364,9 +364,14 @@ async function handleGetInstalledVersions(event: any, branchName: string): Promi
     // Use pathUtils to list branch versions
     const versions = await listBranchVersions(managedEnvironmentPath, branchName);
 
+    // Get custom descriptions from config
+    const manifestVersions = await configService.getBranchManifestVersions(branchName);
+    const buildVersions = await configService.getBranchVersions(branchName);
+
     // Set isActive flag based on config (prioritize manifest over build)
     const versionsWithActiveFlag = versions.map(version => {
       let isActive = false;
+      let description: string | undefined;
       
       if (activeManifestId && version.manifestId) {
         // Check if this is the active manifest version
@@ -375,6 +380,13 @@ async function handleGetInstalledVersions(event: any, branchName: string): Promi
         // Fall back to build ID check if no manifest is active
         isActive = version.buildId === activeBuildId;
       }
+
+      // Get custom description from config
+      if (version.manifestId && manifestVersions && manifestVersions[version.manifestId]) {
+        description = manifestVersions[version.manifestId].description;
+      } else if (version.buildId && buildVersions && buildVersions[version.buildId]) {
+        description = buildVersions[version.buildId].description;
+      }
       
       return {
         buildId: version.buildId || '', // Handle undefined buildId for manifest directories
@@ -382,7 +394,8 @@ async function handleGetInstalledVersions(event: any, branchName: string): Promi
         path: version.path,
         isActive,
         downloadDate: version.downloadDate,
-        sizeBytes: version.sizeBytes
+        sizeBytes: version.sizeBytes,
+        description // Include custom description if available
       };
     });
 
