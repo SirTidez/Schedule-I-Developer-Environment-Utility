@@ -28,14 +28,22 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
   branchKey,
   onVersionChange
 }) => {
-  // Map Steam branch keys to Steam branch names for DepotDownloader
-  const getSteamBranchName = (branchKey: string): string => {
+  // Map Steam branch keys to folder names for DepotDownloader
+  const getBranchFolderName = (branchKey: string): string => {
     console.log('VersionManagerDialog - branchKey received:', branchKey);
     console.log('VersionManagerDialog - branchName received:', branchName);
     
-    // The branchKey is already the Steam branch key (public, beta, alternate, alternate-beta)
-    // We just need to return it as-is for the -beta parameter
-    return branchKey;
+    // Map Steam branch keys to folder names
+    const branchFolderMap: Record<string, string> = {
+      'public': 'main-branch',
+      'beta': 'beta-branch',
+      'alternate': 'alternate-branch',
+      'alternate-beta': 'alternate-beta-branch'
+    };
+    
+    const folderName = branchFolderMap[branchKey] || branchKey;
+    console.log('VersionManagerDialog - mapped folder name:', folderName);
+    return folderName;
   };
   const [userAddedVersions, setUserAddedVersions] = useState<VersionInfo[]>([]);
   const [installedVersions, setInstalledVersions] = useState<VersionInfo[]>([]);
@@ -51,6 +59,7 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
   const [manifestId, setManifestId] = useState('');
   const [description, setDescription] = useState('');
   const [addingVersion, setAddingVersion] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // Load versions when dialog opens
   useEffect(() => {
@@ -185,8 +194,8 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
 
       // Validate manifest ID first
       setError('Validating manifest ID...');
-      const steamBranchName = getSteamBranchName(branchKey);
-      console.log('Using Steam branch name:', steamBranchName);
+      const branchFolderName = getBranchFolderName(branchKey);
+      console.log('Using branch folder name:', branchFolderName);
       console.log('Starting manifest validation with:', {
         depotDownloaderPath,
         username: username ? `${username.substring(0, 3)}***` : 'undefined',
@@ -204,7 +213,7 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
         manifestId.trim(),
         '3164500', // App ID
         '3164501', // Depot ID
-        steamBranchName // Steam branch name
+        branchFolderName // Branch folder name
       );
       
       console.log('Validation result:', validationResult);
@@ -277,7 +286,7 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
         config.depotDownloaderPath,
         username,
         password,
-        getSteamBranchName(branchKey),
+        getBranchFolderName(branchKey),
         version.manifestId,
         '3164500', // Schedule I App ID
         '3164501', // Depot ID
@@ -322,12 +331,22 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
   const handleSetActive = async (buildId: string) => {
     try {
       setLoading(true);
+      setToastMsg('Switching to new version...');
+      
       // Call the config service to set active build
       await window.electronAPI.config.setActiveBuild(branchName, buildId);
       setActiveVersion(buildId);
+      console.log('Calling onVersionChange with buildId:', buildId);
       onVersionChange({ buildId });
+      
+      // Refresh the versions list to update the UI
+      await loadVersions();
+      
+      setToastMsg('Version switched successfully!');
+      setTimeout(() => setToastMsg(null), 3000);
     } catch (err) {
       setError(`Failed to set active version: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setToastMsg(null);
     } finally {
       setLoading(false);
     }
@@ -336,12 +355,22 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
   const handleSetActiveManifest = async (manifestId: string) => {
     try {
       setLoading(true);
+      setToastMsg('Switching to new version...');
+      
       // Call the config service to set active manifest
       await window.electronAPI.config.setActiveManifest(branchName, manifestId);
       setActiveVersion(manifestId);
+      console.log('Calling onVersionChange with manifestId:', manifestId);
       onVersionChange({ manifestId });
+      
+      // Refresh the versions list to update the UI
+      await loadVersions();
+      
+      setToastMsg('Version switched successfully!');
+      setTimeout(() => setToastMsg(null), 3000);
     } catch (err) {
       setError(`Failed to set active manifest: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setToastMsg(null);
     } finally {
       setLoading(false);
     }
@@ -390,16 +419,23 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      onClick={loading ? undefined : onClose}
+    >
+      <div 
+        className="bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-white">
             Manage Versions - {branchName}
           </h2>
           <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+            onClick={loading ? undefined : onClose}
+            disabled={loading}
+            className={`transition-colors ${loading ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:text-white'}`}
           >
             <X size={24} />
           </button>
@@ -408,6 +444,12 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
         {error && (
           <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded mb-4">
             {error}
+          </div>
+        )}
+
+        {toastMsg && (
+          <div className="bg-blue-900/30 border border-blue-500/50 text-blue-200 px-4 py-2 text-sm text-center rounded mb-4">
+            {toastMsg}
           </div>
         )}
 
@@ -621,8 +663,13 @@ export const VersionManagerDialog: React.FC<VersionManagerDialogProps> = ({
           </div>
           <div className="flex space-x-3">
             <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              onClick={loading ? undefined : onClose}
+              disabled={loading}
+              className={`px-4 py-2 rounded transition-colors ${
+                loading 
+                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed' 
+                  : 'bg-gray-600 text-white hover:bg-gray-700'
+              }`}
             >
               Close
             </button>

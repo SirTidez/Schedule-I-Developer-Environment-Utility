@@ -46,5 +46,37 @@ Changed the branch display in ManagedEnvironment component from showing "Active 
 - `src/renderer/components/ManagedEnvironment/ManagedEnvironment.tsx`
 - `src/main/services/SteamUpdateService.ts`
 
+## Unified DepotDownloader Approach
+- **Issue**: ManagedEnvironment was using `downloadBranch` instead of manifest-based approach
+- **Fix**: Updated to use `downloadBranchVersionByManifest` like setup wizard
+- **Benefits**: Consistent manifest-based downloads across all components
+- **Implementation**: Fetches latest manifest ID from Steam API before download
+
+## Complete Manifest Download Integration
+- **Added**: `downloadBranchManifest()` function to download latest manifests
+- **Process**: Downloads manifests → Gets manifest ID → Downloads branch with specific manifest
+- **Config**: Sets active manifest after successful download
+- **MelonLoader**: Installs into version-specific directory (manifest_* folder)
+- **Error Handling**: Comprehensive error handling throughout the process
+- **Unified Flow**: Now matches setup wizard's manifest-based approach exactly
+
+## Bug Fix: Correct Branch Folder Names
+- **Issue**: Installing main branch was creating folder named "public" instead of "main-branch"
+- **Root Cause**: `downloadBranchManifest()` was receiving Steam branch key ("public") but manifest download expects folder names ("main-branch")
+- **Fix**: Pass `branchInfo.folderName` directly to manifest download instead of Steam branch key
+- **Result**: Now correctly creates "main-branch", "beta-branch", etc. folders
+
+## Bug Fix: Correct DepotDownloader Arguments for Public Branch
+- **Issue**: Public branch manifest download was using incorrect `-branch` flag
+- **Root Cause**: Public branch in Steam doesn't need any branch flag, only beta branches need `-beta`
+- **Fix**: Remove branch flag entirely for public branch, use `-beta` only for beta branches
+- **Result**: Public branch manifest download now works correctly without fallback to alternate-beta
+
+## Bug Fix: Version Manager Folder Name Mapping
+- **Issue**: Version manager was downloading to "public" folder instead of "main-branch"
+- **Root Cause**: Version manager was passing Steam branch key ("public") as folder name to download functions
+- **Fix**: Added branch mapping in VersionManagerDialog to convert Steam keys to folder names
+- **Result**: Version manager now downloads to correct folders (main-branch, beta-branch, etc.)
+
 ## Date
 2024-12-19

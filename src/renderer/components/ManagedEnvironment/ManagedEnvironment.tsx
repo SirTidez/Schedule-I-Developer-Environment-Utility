@@ -164,6 +164,14 @@ const ManagedEnvironment: React.FC = () => {
         const activeManifestId = config.activeManifestPerBranch?.[branch.folderName];
         const activeBuildId = config.activeBuildPerBranch?.[branch.folderName];
         const buildId = activeManifestId || activeBuildId || '';
+        
+        console.log(`Branch ${branch.folderName} active versions:`, {
+          activeManifestId,
+          activeBuildId,
+          buildId,
+          configActiveManifest: config.activeManifestPerBranch,
+          configActiveBuild: config.activeBuildPerBranch
+        });
         const lastUpdated = config.branchBuildIds[branch.folderName] ? new Date(config.branchBuildIds[branch.folderName].updatedTime).getTime() / 1000 : Date.now() / 1000;
         
         // Check for active version and executable in version-specific structure
@@ -319,6 +327,47 @@ const ManagedEnvironment: React.FC = () => {
     }
   };
 
+  const downloadBranchManifest = async (branchFolderName: string, appId: string, ddPath: string | undefined): Promise<Record<string, { manifestId: string; buildId: string }>> => {
+    if (!config) throw new Error("Config not available");
+    try {
+      const credRes = await window.electronAPI?.credCache?.get?.();
+      const creds = credRes?.success ? credRes.credentials : null;
+      if (!creds) throw new Error("Credentials not available");
+      if (!config.managedEnvironmentPath) throw new Error('Managed Environment path not available');
+      
+      const branches = [branchFolderName];
+      console.log(`[downloadBranchManifest] Input parameters:`, {
+        branchFolderName,
+        appId,
+        ddPath,
+        branches,
+        managedEnvironmentPath: config.managedEnvironmentPath
+      });
+      
+      const res = await window.electronAPI.depotdownloader.downloadManifests(
+        ddPath || undefined,
+        creds.username,
+        creds.password,
+        branches,
+        appId,
+        config.managedEnvironmentPath
+      );
+
+      console.log(`[downloadBranchManifest] Raw response:`, res);
+
+      if (!res.success || !res.manifests) {
+        throw new Error(res?.error || 'Failed to download manifests');
+      }
+
+      console.log(`[downloadBranchManifest] Successfully downloaded manifests for ${branchFolderName}:`, res.manifests);
+      console.log(`[downloadBranchManifest] Manifest keys:`, Object.keys(res.manifests));
+      return res.manifests;
+    } catch (err) {
+      console.error('Failed to download manifests:', err);
+      throw new Error(err instanceof Error ? err.message : 'Failed to download manifests');
+    }
+  };
+
   const handleInstallBranch = async (branchInfo: BranchInfo) => {
     if (!config) return;
 
@@ -349,46 +398,76 @@ const ManagedEnvironment: React.FC = () => {
             const appId = await window.electronAPI.steam.getScheduleIAppId();
             if (!appId) throw new Error('Could not determine Schedule I App ID');
 
+            if (!creds) throw new Error("Credentials not available");
+
+            if (!config.managedEnvironmentPath) throw new Error('Managed Environment path not available');
+
+            console.log("Starting DepotDownloader installation for branch:", branchInfo.name);
+            console.log("Branch info:", {
+              name: branchInfo.name,
+              folderName: branchInfo.folderName,
+              steamBranchKey: branchInfo.steamBranchKey
+            });
+            console.log("App ID:", appId);
+            
             const ddPath = config.depotDownloaderPath || undefined;
             const branchId = branchInfo.steamBranchKey; // already mapped (public/beta/alternate/alternate-beta)
+            
+            // Download manifests first to get the latest manifest ID
+            console.log("Downloading manifests for branch:", branchInfo.folderName);
+            const manifests = await downloadBranchManifest(branchInfo.folderName, appId, ddPath);
+            
+            // Get the manifest info for this branch
+            const branchFolderName = branchInfo.folderName;
+            console.log(`Looking for manifest info for branch folder: ${branchFolderName}`);
+            console.log(`Available manifest keys:`, Object.keys(manifests));
+            console.log(`Full manifests object:`, manifests);
+            
+            const manifestInfo = manifests[branchFolderName];
+            if (!manifestInfo) {
+              throw new Error(`No manifest information found for ${branchInfo.name} branch (folder: ${branchFolderName}). Available keys: ${Object.keys(manifests).join(', ')}`);
+            }
+            
+            const { manifestId, buildId } = manifestInfo;
+            console.log(`Using manifest ID: ${manifestId} (build ${buildId}) for ${branchInfo.name} (folder: ${branchFolderName})`);
 
-            const res = await window.electronAPI.depotdownloader.downloadBranch(
+            // Download the branch using the manifest ID
+            const res = await window.electronAPI.depotdownloader.downloadBranchVersionByManifest(
               ddPath,
               creds.username,
               creds.password,
-              branchInfo.path,
+              branchFolderName,
+              manifestId,
               appId,
-              branchId
+              config.managedEnvironmentPath             
             );
 
             if (!res?.success) {
               throw new Error(res?.error || 'DepotDownloader failed');
             }
 
-            // For DepotDownloader installations, the buildId is a timestamp string that gets set during the download process
-            // For copy installations, we fetch the numeric buildId from Steam
+            // Set the active manifest for this branch after successful download
             try {
-              // Check if this is a DepotDownloader installation (has manifest info)
-              const activeManifestId = config.activeManifestPerBranch?.[branchInfo.folderName];
-              if (activeManifestId) {
-                // DepotDownloader installation - buildId is already set as timestamp string during download
-                console.log(`Branch ${branchInfo.name}: DepotDownloader installation, buildId already set as timestamp`);
-              } else {
-                // Copy installation - fetch numeric buildId from Steam
-                const steamIdResp = await window.electronAPI.steamUpdate.getBranchBuildId(branchId);
-                const buildId = steamIdResp?.success ? steamIdResp.buildId : undefined;
-                const folderName = branchInfo.path.split('\\').pop() || branchInfo.name.toLowerCase().replace(/\s+/g, '-');
-                if (buildId) {
-                  await window.electronAPI.config.setBuildIdForBranch(folderName, buildId);
-                }
-              }
-            } catch {}
+              console.log(`Setting active manifest ${manifestId} for branch ${branchInfo.folderName}`);
+              await window.electronAPI.config.setActiveManifest(branchInfo.folderName, manifestId);
+              console.log(`Successfully set active manifest for ${branchInfo.name}`);
+            } catch (configErr) {
+              console.warn(`Failed to set active manifest for ${branchInfo.name}:`, configErr);
+            }
 
-            // Install MelonLoader into the branch root if enabled
+            // Install MelonLoader into the version-specific directory if enabled
             try {
               const cfg = await window.electronAPI.config.get();
               if (cfg?.autoInstallMelonLoader) {
-                const mlRes = await window.electronAPI.melonloader.install(branchInfo.path);
+                // Get the version-specific path for MelonLoader installation
+                const versionPath = await window.electronAPI.pathUtils.getBranchVersionPath(
+                  config.managedEnvironmentPath, 
+                  branchInfo.folderName, 
+                  manifestId, 
+                  'manifest'
+                );
+                
+                const mlRes = await window.electronAPI.melonloader.install(versionPath);
                 if (mlRes?.success) {
                   setToastMsg('MelonLoader installed');
                   setTimeout(() => setToastMsg(null), 4000);
@@ -398,6 +477,7 @@ const ManagedEnvironment: React.FC = () => {
                 }
               }
             } catch (e) {
+              console.warn('MelonLoader installation failed:', e);
               setToastMsg('MelonLoader install failed');
               setTimeout(() => setToastMsg(null), 4000);
             }
@@ -609,16 +689,16 @@ const ManagedEnvironment: React.FC = () => {
     if (!selectedBranchForVersionManager) return;
     
     try {
-      if (version.manifestId) {
-        await window.electronAPI.config.setActiveManifest(selectedBranchForVersionManager.folderName, version.manifestId);
-      } else if (version.buildId) {
-        await window.electronAPI.config.setActiveBuild(selectedBranchForVersionManager.folderName, version.buildId);
-      }
-      
-      // Refresh branches to show updated active version
+      console.log('Version change detected, refreshing ManagedEnvironment...', version);
+      // The VersionManagerDialog already handles setting the active version
+      // Refresh config first to get latest active version data
+      await loadConfig();
+      console.log('Config refreshed, now refreshing branches...');
+      // Then refresh branches to show updated active version
       await loadBranches();
+      console.log('ManagedEnvironment refresh completed');
     } catch (err) {
-      console.error('Failed to set active version:', err);
+      console.error('Failed to refresh after version change:', err);
     }
   };
 

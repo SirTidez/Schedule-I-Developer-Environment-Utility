@@ -883,7 +883,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
         const cfg = await window.electronAPI.config.get();
         if (cfg?.autoInstallMelonLoader) {
           // Use the build directory path instead of the manifest directory
-          const buildVersionPath = await window.electronAPI.pathUtils.getBranchVersionPath(managedEnvironmentPath, branch, manifestId, 'build');
+          const buildVersionPath = await window.electronAPI.pathUtils.getBranchVersionPath(managedEnvironmentPath, branch, manifestId, 'manifest');
           addTerminalLog('Installing MelonLoader into build directory...');
           const res = await window.electronAPI.melonloader.install(buildVersionPath);
           if (res?.success) {

@@ -1370,29 +1370,6 @@ async function handleDownloadBranchSequentialDepots(event: any, depotDownloaderP
       }
     }
 
-    // Final manifest copy for all depots
-    // try {
-    //   // Check if we downloaded to a manifest directory and need to copy to build directory
-    //   if (branchPath.includes('manifest_') && !branchPath.includes('build_')) {
-    //     // Create the build directory path (replace manifest_ with build_)
-    //     const buildPath = branchPath.replace(/manifest_(\d+)$/, 'build_$1');
-        
-    //     // Copy contents from manifest directory to build directory
-    //     await copyManifestContentsToBuildDirectory(branchPath, buildPath);
-        
-    //     // Clean up manifest directory
-    //     await cleanupManifestDirectory(branchPath);
-        
-    //     console.log(`Successfully moved contents from manifest directory to build directory`);
-    //   } else {
-    //     // For regular downloads, copy manifest files from .DepotDownloader to main directory
-    //     await copyManifestFilesToBuildDirectory(branchPath);
-    //   }
-    // } catch (manifestError) {
-    //   console.warn('Failed to copy final manifest files:', manifestError);
-    //   // Don't fail the download for manifest copy issues
-    // }
-
     // Send final completion progress
     try {
       event?.sender?.send('depotdownloader-progress', {
@@ -1605,14 +1582,14 @@ async function handleDownloadManifests(
       await fs.ensureDir(tempDir);
 
       try {
-        // Use -beta for all branches except main-branch (which uses -branch)
-        const isMainBranch = branch === 'main-branch';
+        // Use -beta for beta branches, no flag for public branch
+        const isPublicBranch = branch === 'main-branch';
         const args = [
           '-app', appId,
           '-depot', '3164501', // Schedule I depot ID
           '-username', username,
           '-password', password,
-          isMainBranch ? '-branch' : '-beta', branchId,
+          ...(isPublicBranch ? [] : ['-beta', branchId]), // No branch flag for public, -beta for others
           '-dir', tempDir,
           '-manifest-only' // Only download manifest, not full game
         ];
