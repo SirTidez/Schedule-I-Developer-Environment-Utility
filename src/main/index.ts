@@ -15,6 +15,7 @@
 import { app, BrowserWindow, ipcMain, nativeImage } from 'electron';
 import * as path from 'path';
 import { setupSteamHandlers } from './ipc/steamHandlers';
+import { setupSteamBranchHandlers } from './ipc/steamBranchHandlers';
 import { setupConfigHandlers } from './ipc/configHandlers';
 import { setupFileHandlers } from './ipc/fileHandlers';
 import { setupDialogHandlers } from './ipc/dialogHandlers';
@@ -22,6 +23,8 @@ import { setupDepotDownloaderHandlers } from './ipc/depotdownloaderHandlers';
 import { setupSteamLoginHandlers } from './ipc/steamLoginHandlers';
 import { setupSteamUpdateHandlers } from './ipc/steamUpdateHandlers';
 import { setupSystemHandlers } from './ipc/systemHandlers';
+import { setupMigrationHandlers } from './ipc/migrationHandlers';
+import { setupPathUtilsHandlers } from './ipc/pathUtilsHandlers';
 import { registerUpdateHandlers } from './ipc/updateHandlers';
 import { registerShellHandlers } from './ipc/shellHandlers';
 import { registerWindowHandlers } from './ipc/windowHandlers';
@@ -30,6 +33,7 @@ import { setupCredentialCacheHandlers } from './ipc/credentialCacheHandlers';
 import { LoggingService } from './services/LoggingService';
 import { UpdateService } from './services/UpdateService';
 import { registerMelonLoaderHandlers } from './ipc/melonLoaderHandlers';
+import { SteamUpdateService } from './services/SteamUpdateService';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -44,6 +48,7 @@ try {
 const configService = new ConfigService();
 const loggingService = new LoggingService(configService);
 const updateService = new UpdateService(loggingService, configService.getConfigDir());
+const steamUpdateService = new SteamUpdateService(loggingService);
 
 // Initialize logging
 (async () => {
@@ -149,6 +154,7 @@ app.whenReady().then(() => {
   
   // Register all IPC handlers for communication with renderer process
   setupSteamHandlers(); // Steam library detection and management
+  setupSteamBranchHandlers(steamUpdateService, configService, loggingService); // Steam branch version management
   setupConfigHandlers(); // Configuration management
   setupFileHandlers(); // File operations
   setupDialogHandlers(); // Native dialog boxes
@@ -156,6 +162,8 @@ app.whenReady().then(() => {
   setupSteamLoginHandlers(); // Steam login and authentication
   setupSteamUpdateHandlers(loggingService, configService); // Steam update monitoring
   setupSystemHandlers(); // System info (disk space, etc.)
+  setupMigrationHandlers(); // Version migration (build ID to manifest ID)
+  setupPathUtilsHandlers(); // Path utility functions
   setupCredentialCacheHandlers(); // In-memory Steam credential cache
   registerUpdateHandlers(updateService, loggingService); // Update checking
   registerShellHandlers(loggingService); // External URL opening

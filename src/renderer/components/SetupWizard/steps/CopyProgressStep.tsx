@@ -35,7 +35,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
   const [overallProgress, setOverallProgress] = useState(0);
   const [showVerificationDialog, setShowVerificationDialog] = useState(false);
   const [currentBranchIndex, setCurrentBranchIndex] = useState(0);
-  const [copyStatus, setCopyStatus] = useState<'waiting' | 'verifying' | 'copying' | 'completed'>('waiting');
+  const [copyStatus, setCopyStatus] = useState<'waiting' | 'verifying' | 'copying' | 'downloading-manifests' | 'completed'>('waiting');
   const [verificationResolve, setVerificationResolve] = useState<(() => void) | null>(null);
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
   const [showTerminal, setShowTerminal] = useState(false);
@@ -48,6 +48,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
   const [effectiveCreds, setEffectiveCreds] = useState<null | { username: string; password: string; stayLoggedIn: boolean }>(steamCredentials);
   const [branchLogLines, setBranchLogLines] = useState<string[]>([]);
   const [branchLogStart, setBranchLogStart] = useState<Date | null>(null);
+  const [branchManifests, setBranchManifests] = useState<Record<string, { manifestId: string; buildId: string }>>({});
   const [sessionLogLines, setSessionLogLines] = useState<string[]>([]);
   const [sessionLogPath, setSessionLogPath] = useState<string | null>(null);
   const [lastBranchLogPath, setLastBranchLogPath] = useState<string | null>(null);
@@ -407,6 +408,61 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
     }
   };
 
+  const downloadManifestsForBranches = async (branches: string[]): Promise<Record<string, { manifestId: string; buildId: string }>> => {
+    try {
+      if (!steamCredentials || !effectiveCreds) {
+        throw new Error('Steam credentials not available');
+      }
+
+      addTerminalLog('Downloading manifests for all selected branches...');
+      addTerminalLog(`Branches: ${branches.join(', ')}`);
+
+      // Get the Schedule I App ID
+      const appId = await window.electronAPI.steam.getScheduleIAppId();
+      if (!appId) {
+        throw new Error('Could not get Schedule I App ID');
+      }
+
+      addTerminalLog(`App ID: ${appId}`);
+
+      // Download manifests for all branches
+      const result = await window.electronAPI.depotdownloader.downloadManifests(
+        depotDownloaderPath || undefined,
+        effectiveCreds.username,
+        effectiveCreds.password,
+        branches,
+        appId,
+        managedEnvironmentPath
+      );
+
+      console.log('downloadManifestsForBranches - received result:', result);
+      console.log('downloadManifestsForBranches - result.success:', result.success);
+      console.log('downloadManifestsForBranches - result.manifests:', result.manifests);
+
+      if (!result.success || !result.manifests) {
+        throw new Error(result.error || 'Failed to download manifests');
+      }
+
+      addTerminalLog(`✓ Successfully downloaded manifests for ${Object.keys(result.manifests).length} branches`);
+      
+      // Log manifest information
+      for (const [branch, manifestInfo] of Object.entries(result.manifests)) {
+        const info = manifestInfo as { manifestId: string; buildId: string };
+        addTerminalLog(`  ${branch}: manifest ${info.manifestId} (build ${info.buildId})`);
+      }
+
+      console.log('downloadManifestsForBranches - result.manifests keys:', Object.keys(result.manifests));
+      console.log('downloadManifestsForBranches - result.manifests content:', result.manifests);
+
+      return result.manifests;
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      addTerminalLog(`✗ Error downloading manifests: ${errorMessage}`);
+      throw error;
+    }
+  };
+
   const startCopyProcess = async (method: 'copy' | 'depotdownloader') => {
     try {
       console.log('Starting copy process...');
@@ -449,7 +505,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
       // Create all branch directories upfront
       addTerminalLog('Creating directory structure...');
       for (const branch of selectedBranches) {
-        const branchPath = `${managedEnvironmentPath}/branches/${branch}`;
+        const branchPath = await window.electronAPI.pathUtils.getBranchBasePath(managedEnvironmentPath, branch);
         await createDirectory(branchPath);
         addTerminalLog(`Created directory: ${branchPath}`);
       }
@@ -489,6 +545,24 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
       await createConfigFile();
       addTerminalLog('✓ Configuration file created');
 
+      // Download manifests for all branches first (for DepotDownloader method)
+      let manifests: Record<string, { manifestId: string; buildId: string }> = {};
+      if (method === 'depotdownloader') {
+        addTerminalLog('Downloading manifests for all selected branches...');
+        setCopyStatus('downloading-manifests');
+        try {
+          manifests = await downloadManifestsForBranches(selectedBranches);
+          console.log('Downloaded manifests:', manifests);
+          console.log('Setting branchManifests state with keys:', Object.keys(manifests));
+          setBranchManifests(manifests);
+          addTerminalLog('✓ All manifests downloaded successfully');
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          addTerminalLog(`✗ Failed to download manifests: ${errorMessage}`);
+          throw error;
+        }
+      }
+
       // Process each branch (verification only for copy-based flow)
       for (let i = 0; i < selectedBranches.length; i++) {
         if (cancelledRef.current) {
@@ -519,7 +593,7 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
           do {
             try {
               openBranchLog(branch, 'depotdownloader');
-              await downloadBranchWithDepotDownloader(branch);
+              await downloadBranchWithDepotDownloader(branch, manifests);
               await writeBranchLog(branch, 'success');
               await appendSessionLog(`[${new Date().toISOString()}] Downloaded ${branchDisplayNames[branch] || branch}: success`);
               // Delay between branches to avoid auth/rate limits
@@ -587,9 +661,71 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
             }
           } while (!proceed);
         } else {
-          setCopyStatus('verifying');
-          // Show verification dialog for this branch
-          await showBranchVerification(branch);
+          // For other branches, download with DepotDownloader first to get proper manifest ID
+          console.log(`Downloading branch ${branch} with DepotDownloader to get manifest ID`);
+          setCopyStatus('copying');
+          let proceed = false;
+          do {
+            try {
+              openBranchLog(branch, 'depotdownloader');
+              await downloadBranchWithDepotDownloader(branch, manifests);
+              await writeBranchLog(branch, 'success');
+              await appendSessionLog(`[${new Date().toISOString()}] Downloaded ${branchDisplayNames[branch] || branch}: success`);
+              // Delay between branches to avoid auth/rate limits
+              await new Promise(res => setTimeout(res, 5000));
+              proceed = true;
+            } catch (e) {
+              if (cancelledRef.current) {
+                await writeBranchLog(branch, 'cancel');
+                await appendSessionLog(`[${new Date().toISOString()}] Downloaded ${branchDisplayNames[branch] || branch}: cancelled`);
+                await closeSessionLog('cancelled');
+                setIsComplete(true);
+                setCopyStatus('completed');
+                return;
+              }
+              const errMsg = e instanceof Error ? e.message : String(e);
+              await writeBranchLog(branch, 'failure');
+              await appendSessionLog(`[${new Date().toISOString()}] Downloaded ${branchDisplayNames[branch] || branch}: failure - ${errMsg}`);
+              const decision = await showFailureDialog(`Failed to download ${branchDisplayNames[branch] || branch}`, errMsg);
+              if (decision === 'retry') {
+                proceed = false;
+              } else if (decision === 'skip') {
+                proceed = true; // proceed to next branch
+              } else {
+                // cancel setup
+                await writeBranchLog(branch, 'cancel');
+                await closeSessionLog('cancelled');
+                setIsComplete(true);
+                setCopyStatus('completed');
+                return;
+              }
+            }
+          } while (!proceed);
+        }
+      }
+
+      // Update configuration with active manifest IDs for each branch
+      if (method === 'depotdownloader' && manifests && Object.keys(manifests).length > 0) {
+        addTerminalLog('Updating configuration with manifest information...');
+        try {
+          for (const [branchName, manifestInfo] of Object.entries(manifests)) {
+            // Set the active manifest for this branch
+            await window.electronAPI.config.setActiveManifest(branchName, manifestInfo.manifestId);
+            
+            // Store the manifest version information
+            await window.electronAPI.config.setBranchManifestVersion(branchName, manifestInfo.manifestId, {
+              buildId: manifestInfo.buildId,
+              downloadDate: new Date().toISOString(),
+              sizeBytes: 0, // Size will be updated after actual download
+              isActive: true
+            });
+            
+            addTerminalLog(`✓ Set active manifest for ${branchName}: ${manifestInfo.manifestId}`);
+          }
+          addTerminalLog('✓ Configuration updated with manifest information');
+        } catch (configError) {
+          console.error('Failed to update configuration with manifest info:', configError);
+          addTerminalLog(`⚠ Warning: Failed to update configuration with manifest info: ${configError instanceof Error ? configError.message : String(configError)}`);
         }
       }
 
@@ -611,31 +747,40 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
 
   const copyBranchFiles = async (branch: string) => {
     try {
-      const branchPath = `${managedEnvironmentPath}/branches/${branch}`;
       const branchDisplayName = branchDisplayNames[branch] || branch;
       
       addTerminalLog(`Starting copy for ${branchDisplayName} branch...`);
       addTerminalLog(`Source: ${steamLibraryPath}/common/Schedule I`);
-      addTerminalLog(`Destination: ${branchPath}`);
+
+      // Get the Schedule I App ID
+      const appId = await window.electronAPI.steam.getScheduleIAppId();
+      if (!appId) {
+        throw new Error('Could not get Schedule I App ID');
+      }
 
       // Get the current build ID for this branch
       addTerminalLog(`Getting build ID for ${branchDisplayName} branch...`);
       const buildId = await getBranchBuildId(steamLibraryPath, branch);
-      if (buildId) {
-        addTerminalLog(`Build ID for ${branchDisplayName}: ${buildId}`);
-        // Save the build ID to the configuration
-        await window.electronAPI.config.setBuildIdForBranch(branch, buildId);
-        addTerminalLog(`✓ Saved build ID for ${branchDisplayName} branch`);
-      } else {
-        addTerminalLog(`⚠ Could not get build ID for ${branchDisplayName} branch`);
+      if (!buildId) {
+        throw new Error(`Could not get build ID for ${branchDisplayName} branch`);
       }
       
-      // Copy Steam app manifest into branch folder for drift checks
+      addTerminalLog(`Build ID for ${branchDisplayName}: ${buildId}`);
+      
+      // Use build-based path structure (not manifest-based for copy operations)
+      const branchVersionPath = await window.electronAPI.pathUtils.getBranchVersionPath(managedEnvironmentPath, branch, buildId, 'build');
+      addTerminalLog(`Destination: ${branchVersionPath}`);
+      
+      // Ensure the version directory exists
+      await window.electronAPI.file.createDirectory(branchVersionPath);
+      
+      // Save only build ID for copy operations
+      await window.electronAPI.config.setBuildIdForBranch(branch, buildId);
+      await window.electronAPI.config.setActiveBuild(branch, buildId);
+      addTerminalLog(`✓ Saved build ID and set as active version for ${branchDisplayName} branch`);
+      
       try {
-        const appId = await window.electronAPI.steam.getScheduleIAppId();
         if (appId) {
-          addTerminalLog(`Copying Steam app manifest (app ${appId})...`);
-          await window.electronAPI.file.copyManifest(appId, steamLibraryPath, branchPath);
           addTerminalLog(`� Copied appmanifest_${appId}.acf to branch folder`);
         }
       } catch (e) {
@@ -647,9 +792,9 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
       
       addTerminalLog(`Discovering files in: ${gameSourcePath}`);
       
-      await copyGameFiles(gameSourcePath, branchPath);
+      await copyGameFiles(gameSourcePath, branchVersionPath);
       setCompletedBranches(prev => [...prev, branch]);
-      addTerminalLog(`✓ Successfully completed ${branchDisplayName} branch`);
+      addTerminalLog(`✓ Successfully completed ${branchDisplayName} branch (build ${buildId})`);
       
     } catch (err) {
       const errorMsg = `Failed to copy branch ${branch}: ${err instanceof Error ? err.message : String(err)}`;
@@ -659,19 +804,17 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
     }
   };
 
-  const downloadBranchWithDepotDownloader = async (branch: string) => {
+  const downloadBranchWithDepotDownloader = async (branch: string, manifests?: Record<string, { manifestId: string; buildId: string }>) => {
     try {
-      if (!steamCredentials) {
+      if (!steamCredentials || !effectiveCreds) {
         throw new Error('Credentials not available');
       }
 
-      const branchPath = `${managedEnvironmentPath}/branches/${branch}`;
       const branchDisplayName = branchDisplayNames[branch] || branch;
       
       addTerminalLog(`Starting DepotDownloader download for ${branchDisplayName} branch...`);
       addTerminalLog(`DepotDownloader Path: ${depotDownloaderPath || 'PATH/alias'}`);
       addTerminalLog(`Username: ${effectiveCreds.username}`);
-      addTerminalLog(`Destination: ${branchPath}`);
 
       // Get the Schedule I App ID
       const appId = await window.electronAPI.steam.getScheduleIAppId();
@@ -681,6 +824,19 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
 
       addTerminalLog(`App ID: ${appId}`);
 
+      // Get manifest information from the pre-downloaded manifests
+      console.log('Looking for manifest info for branch:', branch);
+      const manifestSource = manifests || branchManifests;
+      console.log('Available manifest keys:', Object.keys(manifestSource));
+      console.log('Manifest content:', manifestSource);
+      const manifestInfo = manifestSource[branch];
+      if (!manifestInfo) {
+        throw new Error(`No manifest information found for ${branchDisplayName} branch (key: ${branch})`);
+      }
+
+      const { manifestId, buildId } = manifestInfo;
+      addTerminalLog(`Using manifest ID: ${manifestId} (build ${buildId})`);
+      
       // Map branch names to Steam branch IDs
       const branchIdMap: Record<string, string> = {
         'main-branch': 'public',
@@ -696,52 +852,40 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
 
       addTerminalLog(`Steam Branch ID: ${branchId}`);
 
-      // Download the branch using DepotDownloader
-      addTerminalLog(`Executing DepotDownloader download command...`);
-      const result = await window.electronAPI.depotdownloader.downloadBranch(
+      // Use version-specific path structure with manifest ID using proper utility function
+      const branchVersionPath = await window.electronAPI.pathUtils.getBranchVersionPath(managedEnvironmentPath, branch, manifestId, 'manifest');
+      addTerminalLog(`Destination: ${branchVersionPath}`);
+      
+      // Ensure the version directory exists
+      await window.electronAPI.file.createDirectory(branchVersionPath);
+
+      // Download the branch using DepotDownloader with manifest ID
+      addTerminalLog(`Executing DepotDownloader download command with manifest ID...`);
+      const result = await window.electronAPI.depotdownloader.downloadBranchVersionByManifest(
         depotDownloaderPath || undefined,
         effectiveCreds.username,
         effectiveCreds.password,
-        branchPath,
+        branch,
+        manifestId,
         appId,
-        branchId
+        managedEnvironmentPath
       );
 
-      if (result.success) {
-        addTerminalLog(`✓ Successfully downloaded ${branchDisplayName} branch with DepotDownloader`);
-        addTerminalLog(`Output: ${result.output}`);
-        
-      // Get and save build ID via node-steam-user for this branch key
-      addTerminalLog(`Getting build ID for ${branchDisplayName} branch from Steam...`);
-      try {
-        const steamBuildResp = await window.electronAPI.steamUpdate.getBranchBuildId(branchId);
-        const buildId = steamBuildResp?.success ? steamBuildResp.buildId : undefined;
-        if (buildId) {
-          addTerminalLog(`Build ID for ${branchDisplayName}: ${buildId}`);
-          await window.electronAPI.config.setBuildIdForBranch(branch, buildId);
-          addTerminalLog(`✓ Saved build ID for ${branchDisplayName} branch`);
-          // Optionally mirror manifest for downstream tools
-          try {
-            const manifestPath = `${branchPath}/appmanifest_${appId}.acf`;
-            const manifest = `"AppState"\n{\n\t"appid"\t"${appId}"\n\t"Universe"\t"1"\n\t"name"\t"Schedule I"\n\t"StateFlags"\t"4"\n\t"installdir"\t"${branch}"\n\t"buildid"\t"${buildId}"\n\t"LastUpdated"\t"${Math.floor(Date.now()/1000)}"\n}`;
-            await window.electronAPI.file.writeText(manifestPath, manifest);
-            addTerminalLog(`✓ Wrote manifest to ${manifestPath}`);
-          } catch (e) {
-            addTerminalLog(`⚠ Failed to write manifest: ${e instanceof Error ? e.message : String(e)}`);
-          }
-        } else {
-          addTerminalLog(`⚠ Could not get build ID for ${branchDisplayName} branch`);
-        }
-      } catch (e) {
-        addTerminalLog(`⚠ Error retrieving build ID: ${e instanceof Error ? e.message : String(e)}`);
+      if (!result.success) {
+        throw new Error(result.error || 'DepotDownloader download failed');
       }
 
-      // Install MelonLoader into the new branch root if enabled
+      addTerminalLog(`✓ Successfully downloaded ${branchDisplayName} branch with DepotDownloader`);
+
+
+      // Install MelonLoader into the build directory (after manifest contents have been copied)
       try {
         const cfg = await window.electronAPI.config.get();
         if (cfg?.autoInstallMelonLoader) {
-          addTerminalLog('Installing MelonLoader into branch root...');
-          const res = await window.electronAPI.melonloader.install(branchPath);
+          // Use the build directory path instead of the manifest directory
+          const buildVersionPath = await window.electronAPI.pathUtils.getBranchVersionPath(managedEnvironmentPath, branch, manifestId, 'build');
+          addTerminalLog('Installing MelonLoader into build directory...');
+          const res = await window.electronAPI.melonloader.install(buildVersionPath);
           if (res?.success) {
             addTerminalLog('✓ MelonLoader installed');
           } else {
@@ -753,11 +897,10 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
       } catch (e) {
         addTerminalLog(`⚠ MelonLoader install error: ${e instanceof Error ? e.message : String(e)}`);
       }
-        setCompletedBranches(prev => [...prev, branch]);
-      } else {
-        throw new Error(result.error || 'DepotDownloader download failed');
-      }
       
+      setCompletedBranches(prev => [...prev, branch]);
+      addTerminalLog(`✓ Successfully completed ${branchDisplayName} branch (manifest ${manifestId})`);
+    
     } catch (err) {
       const errorMsg = `Failed to download branch ${branch} with DepotDownloader: ${err instanceof Error ? err.message : String(err)}`;
       console.error(errorMsg);
@@ -780,17 +923,11 @@ const CopyProgressStep: React.FC<CopyProgressStepProps> = ({
       let proceed = false;
       do {
         try {
-          if (downloadMethod === 'depotdownloader') {
-            openBranchLog(branch, 'depotdownloader');
-            await downloadBranchWithDepotDownloader(branch);
-            await writeBranchLog(branch, 'success');
-            // Delay between branches to avoid rate limits
-            await new Promise(res => setTimeout(res, 5000));
-          } else {
-            openBranchLog(branch, 'copy');
-            await copyBranchFiles(branch);
-            await writeBranchLog(branch, 'success');
-          }
+          // This function is only for copy method verification flow
+          // DepotDownloader flow is handled in the main copy process
+          openBranchLog(branch, 'copy');
+          await copyBranchFiles(branch);
+          await writeBranchLog(branch, 'success');
           proceed = true;
         } catch (e) {
           if (cancelledRef.current) {

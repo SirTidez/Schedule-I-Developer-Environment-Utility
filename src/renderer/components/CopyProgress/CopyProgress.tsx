@@ -120,7 +120,7 @@ const CopyProgress: React.FC = () => {
       addTerminalLog('Starting file copy process...');
 
       // Create the target directory
-      const targetPath = `${branchData.managedEnvironmentPath}/branches/${branchData.folderName}`;
+      const targetPath = await window.electronAPI.pathUtils.getBranchBasePath(branchData.managedEnvironmentPath, branchData.folderName);
       addTerminalLog(`Target directory: ${targetPath}`);
 
       // Start the copy process

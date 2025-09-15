@@ -25,6 +25,7 @@ import CopyProgress from './components/CopyProgress/CopyProgress';
 import DeleteProgress from './components/DeleteProgress/DeleteProgress';
 import DefaultModsProgress from './components/DefaultModsProgress/DefaultModsProgress';
 import SteamCMDSetup from './components/SteamCMDSetup';
+import { MigrationDialog } from './components/MigrationDialog';
 import { CustomTitleBar } from './components/CustomTitleBar/CustomTitleBar';
 import { useConfigValidation } from './hooks/useConfigValidation';
 
@@ -41,7 +42,9 @@ const AppContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [shouldShowManagedEnvironment, setShouldShowManagedEnvironment] = useState(false);
   const [showDepotDownloaderSetup, setShowDepotDownloaderSetup] = useState(false);
+  const [showMigrationDialog, setShowMigrationDialog] = useState(false);
   const [depotDownloaderConfig, setDepotDownloaderConfig] = useState<{useDepotDownloader: boolean, depotDownloaderPath: string | null} | null>(null);
+  const [managedEnvironmentPath, setManagedEnvironmentPath] = useState<string>('');
   const { validation, configExists, validateConfig, checkConfigExists } = useConfigValidation();
   const location = useLocation();
 
@@ -77,8 +80,8 @@ const AppContent: React.FC = () => {
         if (exists) {
           const validationResult = await validateConfig();
           if (validationResult.isValid) {
-            // Valid config found - show managed environment
-            setShouldShowManagedEnvironment(true);
+            // Valid config found - check for migration needs
+            await checkMigrationNeeds();
           }
           // Invalid config - will show setup wizard by default (no dialog)
         }
@@ -86,6 +89,33 @@ const AppContent: React.FC = () => {
       } catch (error) {
         console.error('Error checking configuration:', error);
         // On error, show setup wizard
+      }
+    };
+
+    const checkMigrationNeeds = async () => {
+      try {
+        // Get managed environment path from config
+        const config = await window.electronAPI?.config?.get();
+        if (config?.managedEnvironmentPath) {
+          setManagedEnvironmentPath(config.managedEnvironmentPath);
+          
+          // Check for legacy installations
+          const result = await window.electronAPI?.migration?.detectLegacyInstallations(config.managedEnvironmentPath);
+          if (result?.success && result.installations.length > 0) {
+            // Legacy installations found - show migration dialog
+            setShowMigrationDialog(true);
+          } else {
+            // No legacy installations - show managed environment
+            setShouldShowManagedEnvironment(true);
+          }
+        } else {
+          // No managed environment path - show managed environment anyway
+          setShouldShowManagedEnvironment(true);
+        }
+      } catch (error) {
+        console.error('Error checking migration needs:', error);
+        // On error, show managed environment
+        setShouldShowManagedEnvironment(true);
       }
     };
 
@@ -116,7 +146,7 @@ const AppContent: React.FC = () => {
       if (exists) {
         const validationResult = await validateConfig();
         if (validationResult.isValid) {
-          setShouldShowManagedEnvironment(true);
+          await checkMigrationNeeds();
         }
       }
     } catch (error) {
@@ -125,6 +155,19 @@ const AppContent: React.FC = () => {
       setDepotDownloaderConfig({ useDepotDownloader, depotDownloaderPath });
       setShowDepotDownloaderSetup(false);
     }
+  };
+
+  // Handle migration dialog close
+  const handleMigrationClose = () => {
+    setShowMigrationDialog(false);
+    setShouldShowManagedEnvironment(true);
+  };
+
+  // Handle migration completion
+  const handleMigrationComplete = (result: any) => {
+    console.log('Migration completed:', result);
+    setShowMigrationDialog(false);
+    setShouldShowManagedEnvironment(true);
   };
 
   // Show loading state while checking configuration
@@ -149,6 +192,23 @@ const AppContent: React.FC = () => {
         <CustomTitleBar title="Schedule I Developer Environment - DepotDownloader Setup" />
         <div className="flex-1 overflow-auto">
           <SteamCMDSetup onSetupComplete={handleDepotDownloaderSetupComplete} />
+        </div>
+      </div>
+    );
+  }
+
+  // Show migration dialog if needed
+  if (showMigrationDialog) {
+    return (
+      <div className="h-screen bg-gray-900 text-white flex flex-col overflow-hidden">
+        <CustomTitleBar title="Schedule I Developer Environment - Migration" />
+        <div className="flex-1 overflow-auto">
+          <MigrationDialog
+            isOpen={showMigrationDialog}
+            onClose={handleMigrationClose}
+            managedEnvironmentPath={managedEnvironmentPath}
+            onMigrationComplete={handleMigrationComplete}
+          />
         </div>
       </div>
     );

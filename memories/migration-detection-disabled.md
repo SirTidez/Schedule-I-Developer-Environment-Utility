@@ -1,0 +1,1 @@
+Migration detection logic commented out in VersionMigrationService to prevent incorrect flagging of new downloads as legacy.

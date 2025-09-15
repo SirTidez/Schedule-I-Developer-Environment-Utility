@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import * as fs from 'fs-extra';
 import * as path from 'path';
+import { getBranchVersionPath, ensureBranchVersionDirectory, detectLegacyBranchStructure, migrateLegacyBranch } from '../utils/pathUtils';
 
 export function setupFileHandlers() {
   ipcMain.handle('file:copy-game', async (event, sourcePath: string, destinationPath: string) => {
@@ -124,6 +125,24 @@ export function setupFileHandlers() {
       return { success: true };
     } catch (error) {
       const errorMessage = `Failed to copy app manifest for app ${appId}: ${error instanceof Error ? error.message : String(error)}`;
+      console.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+  });
+
+  // New handler for migrating legacy branch structure
+  ipcMain.handle('file:migrate-legacy-branch', async (event, branchPath: string, buildId: string) => {
+    try {
+      console.log(`Migrating legacy branch structure: ${branchPath} to build: ${buildId}`);
+      
+      if (!branchPath || !buildId) {
+        throw new Error('Branch path and build ID are required for migration');
+      }
+
+      const result = await migrateLegacyBranch(branchPath, buildId);
+      return result;
+    } catch (error) {
+      const errorMessage = `Failed to migrate legacy branch ${branchPath}: ${error instanceof Error ? error.message : String(error)}`;
       console.error(errorMessage);
       throw new Error(errorMessage);
     }

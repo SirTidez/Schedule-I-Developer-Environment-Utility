@@ -83,18 +83,20 @@
     "postcss": "^8.5.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "rimraf": "^5.0.5",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
-    "vite": "^7.1.5",
-    "rimraf": "^5.0.5"
+    "vite": "^7.1.5"
   },
   "dependencies": {
     "@types/react-router-dom": "^5.3.3",
     "electron-log": "^5.4.3",
     "electron-store": "^10.1.0",
+    "extract-zip": "^2.0.1",
     "fs-extra": "^11.3.1",
+    "lucide-react": "^0.544.0",
     "react-router-dom": "^7.8.2",
     "steam-user": "^5.2.3",
-    "extract-zip": "^2.0.1"
+    "vdf": "^0.0.2"
   }
 }

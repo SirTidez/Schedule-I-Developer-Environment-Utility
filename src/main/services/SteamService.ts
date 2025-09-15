@@ -17,23 +17,10 @@
 
 import * as fs from 'fs-extra';
 import * as path from 'path';
+import * as vdf from 'vdf';
+import { AppManifest, InstalledDepotInfo } from '../../shared/types';
 
-/**
- * Interface representing a Steam app manifest
- * 
- * Contains essential information about a Steam application including
- * build ID, name, state, and last update timestamp.
- */
-export interface AppManifest {
-  /** The build ID of the application */
-  buildId: number;
-  /** The display name of the application */
-  name: string;
-  /** The current state of the application */
-  state: number;
-  /** Unix timestamp of the last update */
-  lastUpdated: number;
-}
+// AppManifest interface is now imported from shared/types
 
 /**
  * Steam Service class for managing Steam-related operations
@@ -176,12 +163,12 @@ export class SteamService {
    * Steam application, extracting build information and metadata.
    * 
    * @param appId The Steam App ID to parse
-   * @param libraryPath The Steam library path containing the manifest
+   * @param libraryPath The Steam library steamapps folder path containing the manifest (must be the steamapps folder, not the library root)
    * @returns Promise<AppManifest> Parsed manifest data
    * @throws Error if manifest file is not found or cannot be read
    */
   async parseAppManifest(appId: string, libraryPath: string): Promise<AppManifest> {
-    const manifestPath = path.join(libraryPath, 'steamapps', `appmanifest_${appId}.acf`);
+    const manifestPath = path.join(libraryPath, `appmanifest_${appId}.acf`);
     
     if (!await fs.pathExists(manifestPath)) {
       throw new Error(`App manifest not found: ${manifestPath}`);
@@ -194,25 +181,193 @@ export class SteamService {
   /**
    * Parses ACF (Application Cache File) content to extract app manifest data
    * 
-   * Uses regex patterns to extract build ID, name, state flags, and last updated
-   * timestamp from the ACF file content. Provides fallback values for missing data.
+   * Uses a proper VDF parser to extract build ID, name, state flags, last updated
+   * timestamp, and installed depot information from the ACF file content.
    * 
    * @param content The raw ACF file content
    * @returns AppManifest Parsed manifest data with fallback values
    */
   private parseACFContent(content: string): AppManifest {
-    // Parse ACF format (similar to original C# implementation)
+    try {
+      const parsed = vdf.parse(content);
+      const data = parsed.AppState ?? parsed;
+      
+      return {
+        buildId: data.buildid ? parseInt(data.buildid) : 0,
+        name: data.name || '',
+        state: data.StateFlags ? parseInt(data.StateFlags) : 0,
+        lastUpdated: data.LastUpdated ? parseInt(data.LastUpdated) : 0,
+        installedDepots: this.parseInstalledDepots(data.InstalledDepots)
+      };
+    } catch (error) {
+      console.error('Error parsing ACF content:', error);
+      // Fallback to regex parsing for backward compatibility
+      return this.parseACFContentRegex(content);
+    }
+  }
+
+  /**
+   * Fallback regex-based ACF parser for backward compatibility
+   * 
+   * @param content The raw ACF file content
+   * @returns AppManifest Parsed manifest data with fallback values
+   */
+  private parseACFContentRegex(content: string): AppManifest {
     const buildIdMatch = content.match(/"buildid"\s+"(\d+)"/);
     const nameMatch = content.match(/"name"\s+"([^"]+)"/);
     const stateMatch = content.match(/"StateFlags"\s+"(\d+)"/);
     const lastUpdatedMatch = content.match(/"LastUpdated"\s+"(\d+)"/);
     
+    // Parse InstalledDepots using regex fallback
+    const installedDepots = this.parseInstalledDepotsRegex(content);
+    
     return {
       buildId: buildIdMatch ? parseInt(buildIdMatch[1]) : 0,
       name: nameMatch ? nameMatch[1] : '',
       state: stateMatch ? parseInt(stateMatch[1]) : 0,
-      lastUpdated: lastUpdatedMatch ? parseInt(lastUpdatedMatch[1]) : 0
+      lastUpdated: lastUpdatedMatch ? parseInt(lastUpdatedMatch[1]) : 0,
+      installedDepots
     };
+  }
+
+  /**
+   * Fallback regex-based InstalledDepots parser
+   * 
+   * @param content The raw ACF file content
+   * @returns Record<string, InstalledDepotInfo> | undefined Map of depot ID to depot info
+   */
+  private parseInstalledDepotsRegex(content: string): Record<string, InstalledDepotInfo> | undefined {
+    try {
+      // Look for InstalledDepots block
+      const installedDepotsMatch = content.match(/"InstalledDepots"\s*\{([^}]+)\}/);
+      if (!installedDepotsMatch) {
+        return undefined;
+      }
+
+      const depotsContent = installedDepotsMatch[1];
+      const depots: Record<string, InstalledDepotInfo> = {};
+
+      // Find all depot blocks within InstalledDepots
+      const depotMatches = depotsContent.match(/"(\d+)"\s*\{([^}]+)\}/g);
+      if (!depotMatches) {
+        return undefined;
+      }
+
+      for (const depotMatch of depotMatches) {
+        const depotIdMatch = depotMatch.match(/"(\d+)"/);
+        if (!depotIdMatch) continue;
+
+        const depotId = depotIdMatch[1];
+        const depotContent = depotMatch;
+
+        // Extract manifest ID from depot content
+        const manifestMatch = depotContent.match(/"manifest"\s+"([^"]+)"/);
+        const sizeMatch = depotContent.match(/"size"\s+"(\d+)"/);
+        const lastUpdatedMatch = depotContent.match(/"lastupdated"\s+"(\d+)"/);
+
+        depots[depotId] = {
+          depotId: depotId,
+          manifestId: manifestMatch ? manifestMatch[1] : '',
+          size: sizeMatch ? parseInt(sizeMatch[1]) : undefined,
+          lastUpdated: lastUpdatedMatch ? parseInt(lastUpdatedMatch[1]) : undefined
+        };
+      }
+
+      return Object.keys(depots).length > 0 ? depots : undefined;
+    } catch (error) {
+      console.error('Error parsing InstalledDepots with regex:', error);
+      return undefined;
+    }
+  }
+
+
+  /**
+   * Parses the InstalledDepots section to extract manifest IDs
+   * 
+   * @param installedDepotsData The InstalledDepots section from VDF
+   * @returns Record<string, InstalledDepotInfo> Map of depot ID to depot info
+   */
+  private parseInstalledDepots(installedDepotsData: any): Record<string, InstalledDepotInfo> | undefined {
+    if (!installedDepotsData || typeof installedDepotsData !== 'object') {
+      return undefined;
+    }
+
+    const depots: Record<string, InstalledDepotInfo> = {};
+    
+    for (const [depotId, depotData] of Object.entries(installedDepotsData)) {
+      if (typeof depotData === 'object' && depotData !== null) {
+        const depotInfo = depotData as any;
+        depots[depotId] = {
+          depotId: depotId,
+          manifestId: depotInfo.manifest || '',
+          size: depotInfo.size ? parseInt(depotInfo.size) : undefined,
+          lastUpdated: depotInfo.lastupdated ? parseInt(depotInfo.lastupdated) : undefined
+        };
+      }
+    }
+    
+    return Object.keys(depots).length > 0 ? depots : undefined;
+  }
+
+  /**
+   * Gets the primary manifest ID from installed depots
+   * 
+   * @param manifest The app manifest containing installed depots
+   * @returns string | null The primary manifest ID or null if not found
+   */
+  getPrimaryManifestId(manifest: AppManifest): string | null {
+    if (!manifest.installedDepots) {
+      return null;
+    }
+
+    // Get priority depots from config or use defaults
+    const priorityDepots = this.getPriorityDepots();
+    
+    for (const depotId of priorityDepots) {
+      const depot = manifest.installedDepots[depotId];
+      if (depot && depot.manifestId) {
+        return depot.manifestId;
+      }
+    }
+    
+    // Fallback to first available manifest ID
+    for (const depot of Object.values(manifest.installedDepots)) {
+      if (depot.manifestId) {
+        return depot.manifestId;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Gets the priority depot IDs for manifest selection
+   * 
+   * @returns string[] Array of depot IDs in priority order
+   */
+  private getPriorityDepots(): string[] {
+    // Default priority order for depot IDs (main executable depot first)
+    const defaultPriorityDepots = ['3164501', '3164500', '3164502'];
+    
+    // TODO: In the future, this could be made configurable via ConfigService
+    // For now, return the default priority order
+    return defaultPriorityDepots;
+  }
+
+  /**
+   * Gets all installed manifest IDs from a manifest
+   * 
+   * @param manifest The app manifest containing installed depots
+   * @returns string[] Array of manifest IDs
+   */
+  getInstalledManifestIds(manifest: AppManifest): string[] {
+    if (!manifest.installedDepots) {
+      return [];
+    }
+
+    return Object.values(manifest.installedDepots)
+      .map(depot => depot.manifestId)
+      .filter(manifestId => manifestId && manifestId.length > 0);
   }
   
   async getSteamLibraries(): Promise<string[]> {

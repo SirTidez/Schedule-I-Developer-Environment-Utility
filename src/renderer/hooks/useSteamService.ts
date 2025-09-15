@@ -182,6 +182,24 @@ export const useSteamService = () => {
     }
   }, []);
 
+  const getInstalledManifestIds = useCallback(async (appId: string, libraryPath: string): Promise<string[]> => {
+    try {
+      return await window.electronAPI.steam.getInstalledManifestIds(appId, libraryPath);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to get installed manifest IDs';
+      throw new Error(errorMessage);
+    }
+  }, []);
+
+  const getPrimaryManifestId = useCallback(async (appId: string, libraryPath: string): Promise<string | null> => {
+    try {
+      return await window.electronAPI.steam.getPrimaryManifestId(appId, libraryPath);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to get primary manifest ID';
+      throw new Error(errorMessage);
+    }
+  }, []);
+
   return {
     libraries,
     loading,
@@ -198,5 +216,7 @@ export const useSteamService = () => {
     getBranchBuildId,
     getCurrentSteamBuildId,
     detectCurrentSteamBranchKey,
+    getInstalledManifestIds,
+    getPrimaryManifestId,
   };
 };
