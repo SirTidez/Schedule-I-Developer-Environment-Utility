@@ -2,6 +2,70 @@
 
 All notable changes to the Schedule I Developer Environment Utility are documented in this file.
 
+## [2.2.0] - 2025-01-21
+
+### 🏷️ Custom Description Management System
+
+This release introduces a comprehensive custom description management system that allows users to add meaningful names to their installed game versions, making version identification and management much more user-friendly.
+
+#### Added
+- **Setup Wizard Enhancement**: 
+  - Added custom description input fields in BranchSelectionStep
+  - Users can now assign meaningful names when installing branches
+  - Descriptions are optional and appear when branches are selected
+  - Real-time description updates during branch selection
+
+- **Version Manager Enhancement**:
+  - Added edit icon next to each installed build name
+  - Inline editing functionality for existing custom descriptions
+  - Save and cancel buttons with loading states during save operations
+  - Keyboard shortcuts: Enter to save, Escape to cancel
+  - Toast notifications for successful updates
+
+- **Persistent Storage System**:
+  - Custom descriptions are saved in configuration storage
+  - Descriptions persist across application sessions
+  - Support for both manifest-based and build-based versions
+  - Automatic description transfer from setup wizard to installed builds
+
+- **Enhanced User Experience**:
+  - Better version identification with user-friendly custom names
+  - Visual feedback with edit icons and loading states
+  - Seamless integration with existing version management workflow
+
+#### Changed
+- **Setup Wizard Flow**: 
+  - BranchSelectionStep now captures and passes custom descriptions through the installation flow
+  - CopyProgressStep updated to store custom descriptions during installation
+  - Support for both DepotDownloader and copy-based installations
+
+- **Version Manager UI**: 
+  - Added edit functionality with intuitive icon-based interface
+  - Enhanced version display with custom descriptions
+  - Improved version loading to include custom descriptions from config
+
+- **Data Storage Architecture**:
+  - Enhanced version information storage to include custom descriptions
+  - Updated IPC handlers to support description fields
+  - Improved data merging between filesystem and configuration sources
+
+#### Fixed
+- **Description Persistence Bug**: 
+  - Fixed critical issue where custom descriptions were being overwritten during refresh operations
+  - Root cause: handleGetInstalledVersions function was not loading custom descriptions from config
+  - Solution: Enhanced version loading to properly merge filesystem and configuration data
+
+- **Version Loading System**:
+  - Improved version loading to include custom descriptions from both manifest and build versions
+  - Fixed all refresh scenarios: initial load, after installation, manual refresh, version changes, and download cancellation
+  - Updated TypeScript interfaces to include description fields
+
+#### Technical Improvements
+- **IPC Handler Updates**: Enhanced `handleGetInstalledVersions` to load custom descriptions from config
+- **TypeScript Interfaces**: Updated return types to include optional description fields
+- **Data Flow**: Improved data flow from setup wizard through installation to version management
+- **Error Handling**: Added proper error handling for description save operations
+
 ## [2.1.1] - 2025-09-14
 
 ### Highlights
@@ -10,7 +74,7 @@ All notable changes to the Schedule I Developer Environment Utility are document
 - Automatic MelonLoader install after DepotDownloader downloads (safe OSS unzip)
 - Managed Environment UX: inline login, per-branch progress + cancel, repair status
 - Setup Wizard UX: clear Steam login messaging, restored Next on integration step, dedicated MelonLoader prompt
-- Version + packaging: v2.1.1, output to `dist-v2.1.1/`, cleaner prepackage
+- Version + packaging: v2.2.0, output to `dist-v2.2.0/`, cleaner prepackage
 
 ### Security
 
@@ -41,8 +105,8 @@ All notable changes to the Schedule I Developer Environment Utility are document
 
 ### Versioning & Packaging
 
-- App version: 2.1.1 (title bar and UI)
-- Output directory: `dist-v2.1.1/`
+- App version: 2.2.0 (title bar and UI)
+- Output directory: `dist-v2.2.0/`
 - Added `clean` and `prepackage` scripts to remove previous outputs and rebuild
 - Windows dev icon: uses `Assets/icon.ico` (fallback to PNG)
 - Log filename: `DD-MM-YYYY-HH-MM.log`

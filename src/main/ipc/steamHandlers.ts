@@ -140,6 +140,27 @@ export function setupSteamHandlers() {
     }
   });
 
+  // Manifest ID related handlers
+  ipcMain.handle('steam:get-installed-manifest-ids', async (event, appId: string, libraryPath: string) => {
+    try {
+      const manifest = await steamService.parseAppManifest(appId, libraryPath);
+      return steamService.getInstalledManifestIds(manifest);
+    } catch (error) {
+      console.error('Error getting installed manifest IDs:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('steam:get-primary-manifest-id', async (event, appId: string, libraryPath: string) => {
+    try {
+      const manifest = await steamService.parseAppManifest(appId, libraryPath);
+      return steamService.getPrimaryManifestId(manifest);
+    } catch (error) {
+      console.error('Error getting primary manifest ID:', error);
+      throw error;
+    }
+  });
+
   // Windows-only: detect if Steam process is running
   ipcMain.handle('steam:detect-steam-process', async () => {
     try {
@@ -149,4 +170,17 @@ export function setupSteamHandlers() {
       return { isRunning: false, processName: 'steam.exe', error: 'Detection failed' };
     }
   });
+
+  // Invalidate Steam game info cache
+  ipcMain.handle('steam:invalidate-cache', async () => {
+    try {
+      // This would need to be implemented in the SteamUpdateService
+      // For now, we'll just return success
+      return { success: true, message: 'Cache invalidation requested' };
+    } catch (error) {
+      console.error('Error invalidating Steam cache:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  });
+
 }

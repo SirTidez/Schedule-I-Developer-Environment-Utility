@@ -3,6 +3,45 @@
 ## Project Overview
 Successfully initiated the conversion of the C# WinUI 3 application "Schedule I Developer Environment Utility" to an Electron-based web UI application. The conversion maintains feature parity while providing cross-platform compatibility and modern development tools.
 
+## Recent Fixes (2024-12-19)
+
+### Manifest to Build Directory Copy Fix ✅
+- **Issue**: DepotDownloader was downloading builds to `manifest_<manifest_id>` folders, but the application expected builds to be in `build_<manifest_id>` folders
+- **Root Cause**: DepotDownloader downloads to manifest directories, but MelonLoader and other components expect build directories
+- **Solution**: 
+  - Added `copyManifestContentsToBuildDirectory()` and `cleanupEmptyManifestDirectory()` helper functions
+  - Updated all download functions to copy contents from manifest directories to build directories after successful downloads
+  - Updated MelonLoader installation to use build directory instead of manifest directory
+  - Automatic cleanup of empty manifest folders after copy
+- **Impact**: Ensures all builds are in `build_<manifest_id>` directories for consistency, MelonLoader installs to correct directory, and proper cleanup of manifest folders
+- **Files Modified**: `src/main/ipc/depotdownloaderHandlers.ts`, `src/renderer/components/SetupWizard/steps/CopyProgressStep.tsx`
+- **Details**: Non-breaking enhancement that improves directory organization and ensures consistent path references throughout the application
+
+### Branch Path Construction Fix ✅
+- **Issue**: Setup wizard was creating incorrect directory structures with nested `branches` folders when downloading branches using DepotDownloader
+- **Root Cause**: Components were manually constructing branch paths using string concatenation instead of centralized utility functions
+- **Solution**: 
+  - Created `pathUtils` IPC handlers to expose path utility functions to renderer process
+  - Updated all components to use `window.electronAPI.pathUtils.getBranchVersionPath()` instead of manual string concatenation
+  - Fixed path construction in CopyProgressStep, ManagedEnvironment, CopyProgress, and DefaultModsProgress components
+- **Impact**: Eliminates nested `branches` directory issue and ensures consistent path construction across all components
+- **Files Modified**: `src/main/ipc/pathUtilsHandlers.ts` (new), `src/preload/index.ts`, `src/main/index.ts`, multiple renderer components
+- **Details**: Now creates correct structure `Dev Env/branches/branch-name/manifest_id/` instead of `Dev Env/branches/branches/branch-name/`
+
+### parseAppManifest JSDoc Documentation Enhancement ✅
+- **Issue**: The `parseAppManifest` method in `SteamService.ts` lacked clear documentation about the `libraryPath` parameter format
+- **Solution**: Updated JSDoc to specify that `libraryPath` must be the steamapps folder path, not the library root
+- **Impact**: Improves developer understanding and prevents incorrect usage
+- **Files Modified**: `src/main/services/SteamService.ts`, `src/main/services/VersionMigrationService.ts`
+- **Details**: Added clarifying comments in `VersionMigrationService.ts` to document that paths are already in correct format
+
+### parseAppManifest Path Construction Fix ✅
+- **Issue**: The `parseAppManifest` method in `SteamService.ts` was incorrectly constructing manifest paths by adding `'steamapps'` to the `libraryPath` parameter
+- **Root Cause**: The method was treating steamapps paths as Steam library root paths and incorrectly appending `'steamapps'` to them
+- **Solution**: Updated path construction from `path.join(libraryPath, 'steamapps', ...)` to `path.join(libraryPath, ...)`
+- **Impact**: Fixes "manifest not found" errors when parsing Steam app manifests
+- **Files Modified**: `src/main/services/SteamService.ts`
+
 ## Completed Tasks (Phase 1)
 
 ### 1. Project Setup ✅
@@ -820,3 +859,448 @@ const checkOutput = (data: string) => {
 ## Status: Steam Guard Authentication Handling Complete ✅
 
 The SteamCMD integration now properly handles Steam Guard authentication by waiting for user confirmation instead of treating it as a failure. Users receive clear instructions and visual feedback while the system waits for their confirmation in the Steam Mobile app.
+
+## Version Manager Credential Fix (2025-01-10) ✅
+
+### Problem
+Users were getting an error when trying to add a new version saying they need to enter Steam credentials, even though they were already logged in.
+
+### Root Cause
+The Version Manager dialog was trying to retrieve Steam credentials from the config file instead of using the cached credentials that are set when users log in.
+
+### Solution
+Updated `handleAddVersion` function in `VersionManagerDialog.tsx` to use cached credentials:
+- Changed from `window.electronAPI.config.get()` to `window.electronAPI.credCache.get()`
+- Added proper error handling when cached credentials are not available
+- Added debugging logs to help troubleshoot credential issues
+
+### Files Modified
+- `src/renderer/components/VersionManager/VersionManagerDialog.tsx`
+
+### Status: Complete ✅
+Users can now add new versions without re-entering Steam credentials when already logged in.
+
+## Version Manager setActiveBuild Implementation (2025-01-10) ✅
+
+### Completed Tasks (Version Manager setActiveBuild Implementation)
+
+#### 1. Uncommented setActiveBuild Call ✅
+- **VersionManagerDialog.tsx**: Uncommented the `setActiveBuild` call in `handleSetActive` function
+- **Functionality**: Now properly calls the config service to set the active build for a branch
+- **Integration**: Seamlessly integrated with existing version management workflow
+
+#### 2. Verified Complete Implementation ✅
+- **ConfigService.ts**: `setActiveBuild` method already implemented (lines 229-241)
+- **configHandlers.ts**: IPC handler `config:set-active-build` already implemented (lines 174-181)
+- **preload/index.ts**: API exposure already configured (line 78)
+- **Type Definitions**: Complete TypeScript interfaces already defined
+
+#### 3. Implementation Details ✅
+- **Method**: `setActiveBuild(branchName: string, buildId: string): void`
+- **Functionality**: Sets the active build for a branch and updates all version flags
+- **Persistence**: Changes are automatically saved to configuration
+- **State Management**: Updates both `activeBuildPerBranch` and `isActive` flags in `branchVersions`
+
+### Technical Implementation Details
+
+#### setActiveBuild Method
+```typescript
+setActiveBuild(branchName: string, buildId: string): void {
+  const config = this.getConfig();
+  config.activeBuildPerBranch[branchName] = buildId;
+  
+  // Update the isActive flag for all versions of this branch
+  if (config.branchVersions[branchName]) {
+    Object.keys(config.branchVersions[branchName]).forEach(versionBuildId => {
+      config.branchVersions[branchName][versionBuildId].isActive = versionBuildId === buildId;
+    });
+  }
+  
+  this.updateConfig(config);
+}
+```
+
+#### Version Manager Integration
+- **handleSetActive**: Now calls `window.electronAPI.config.setActiveBuild(branchName, buildId)`
+- **Error Handling**: Proper error handling with user feedback
+- **State Updates**: Updates local state and triggers parent component updates
+- **Loading States**: Shows loading indicator during the operation
+
+#### Benefits Achieved
+1. **Complete Functionality**: Version manager now fully functional for setting active builds
+2. **Data Persistence**: Active build selection is saved and persists across app restarts
+3. **State Consistency**: All version flags are properly updated when setting active build
+4. **User Experience**: Seamless integration with existing version management workflow
+5. **Error Handling**: Proper error feedback if the operation fails
+
+### Files Modified
+- **src/renderer/components/VersionManager/VersionManagerDialog.tsx**: Uncommented setActiveBuild call
+
+## Status: Version Manager setActiveBuild Implementation Complete ✅
+
+The Version Manager dialog now properly implements the `setActiveBuild` functionality. Users can set any installed version as the active build for a branch, and the selection is persisted in the configuration. The implementation leverages the existing complete infrastructure for configuration management and IPC communication.
+
+## Config API Coherence Verification (2025-01-10) ✅
+
+### Completed Tasks (Config API Coherence Verification)
+
+#### 1. API Handler Verification ✅
+- **configHandlers.ts**: Verified that `config:get-max-recent-builds` and `config:set-max-recent-builds` handlers are fully implemented
+  - Lines 192-208: Complete IPC handler implementation
+  - Proper error handling and logging
+  - Integration with ConfigService methods
+
+#### 2. ConfigService Method Verification ✅
+- **ConfigService.ts**: Verified that `getMaxRecentBuilds()` and `setMaxRecentBuilds()` methods are fully implemented
+  - Lines 257-270: Complete method implementation
+  - Value clamping (1-50 range) for setMaxRecentBuilds
+  - Default value handling (10) for getMaxRecentBuilds
+  - Proper configuration persistence
+
+#### 3. Preload API Exposure Verification ✅
+- **preload/index.ts**: Verified that API methods are properly exposed
+  - Lines 80-81: API methods exposed in electronAPI.config
+  - Type definitions included in global Window interface (lines 289-290)
+  - Consistent with other config API methods
+
+#### 4. Type Definition Verification ✅
+- **types.ts**: Verified that `maxRecentBuilds` property is defined in DevEnvironmentConfig
+  - Line 26: `maxRecentBuilds: number; // Number of recent builds to show (default: 10)`
+  - Properly typed and documented
+
+#### 5. Functionality Testing ✅
+- **Test Results**: Created and ran comprehensive test script
+  - ✓ getMaxRecentBuilds returns correct default value (10)
+  - ✓ setMaxRecentBuilds successfully updates value
+  - ✓ Value clamping works correctly (0 → 1, 100 → 50)
+  - ✓ Configuration persistence works properly
+
+### Technical Implementation Details
+
+#### API Coherence Status
+- **Preload Exposure**: ✅ Complete - Methods exposed in electronAPI.config
+- **IPC Handlers**: ✅ Complete - Handlers implemented in configHandlers.ts
+- **Service Methods**: ✅ Complete - Methods implemented in ConfigService.ts
+- **Type Definitions**: ✅ Complete - Types defined in shared/types.ts
+- **Functionality**: ✅ Complete - All methods work correctly with proper validation
+
+#### Current Usage
+- **SettingsDialog.tsx**: Uses `config.update()` method to save maxRecentBuilds (line 46)
+- **Individual Methods**: Available but not currently used in UI components
+- **API Consistency**: All exposed methods have corresponding implementations
+
+### Benefits Achieved
+
+1. **API Coherence**: All exposed config methods have complete implementations
+2. **Type Safety**: Full TypeScript support for all config operations
+3. **Functionality**: All methods work correctly with proper validation and persistence
+4. **Consistency**: API follows same patterns as other config methods
+5. **Future-Proof**: Ready for any UI components that need individual method access
+
+### Files Verified
+- **src/preload/index.ts**: API exposure and type definitions
+- **src/main/ipc/configHandlers.ts**: IPC handler implementations
+- **src/main/services/ConfigService.ts**: Service method implementations
+- **src/shared/types.ts**: Type definitions
+- **src/renderer/components/Settings/SettingsDialog.tsx**: Current usage pattern
+
+## Status: Config API Coherence Verification Complete ✅
+
+The config API is fully coherent with all exposed methods (`config:get-max-recent-builds` and `config:set-max-recent-builds`) having complete implementations in the ConfigService, IPC handlers, and preload script. The API is ready for use and maintains consistency with the rest of the configuration system.
+
+## Version Manager Credential Integration (2025-01-10) ✅
+
+### Completed Tasks (Version Manager Credential Integration)
+
+#### 1. Credential Retrieval Implementation ✅
+- **VersionManagerDialog.tsx**: Modified `handleDownloadSelected` function to retrieve cached credentials before calling `downloadBranchVersion`
+- **Credential Check**: Added `window.electronAPI.credCache.get()` call to retrieve cached Steam credentials
+- **Validation**: Added proper validation to ensure credentials are available before proceeding with download
+
+#### 2. Error Handling and User Guidance ✅
+- **Error Messages**: Enhanced error handling with clear user guidance when credentials are not available
+- **User Feedback**: Added informative error message: "Steam credentials not found. Please login to Steam first or use the Steam login section to authenticate."
+- **Graceful Degradation**: Download process stops gracefully when credentials are not available
+
+#### 3. Integration with Existing Systems ✅
+- **Credential Cache**: Leverages existing `credCache` API from preload script
+- **DepotDownloader**: Passes retrieved credentials to `downloadBranchVersion` IPC call
+- **Error Propagation**: Maintains existing error handling patterns while adding credential validation
+
+### Technical Implementation Details
+
+#### Credential Retrieval Flow
+1. **User Initiates Download**: User selects versions and clicks download
+2. **Credential Check**: System calls `window.electronAPI.credCache.get()` to retrieve cached credentials
+3. **Validation**: Checks if credentials are available and valid
+4. **Download or Error**: Either proceeds with download using cached credentials or shows error message
+
+#### Code Changes
+```typescript
+// Retrieve cached credentials
+const credResult = await window.electronAPI.credCache.get();
+if (!credResult.success || !credResult.credentials) {
+  setError('Steam credentials not found. Please login to Steam first or use the Steam login section to authenticate.');
+  setDownloading(false);
+  return;
+}
+
+const { username, password } = credResult.credentials;
+
+// Download the version with cached credentials
+await window.electronAPI.depotdownloader.downloadBranchVersion(
+  config.depotDownloaderPath,
+  username,
+  password,
+  branchName,
+  buildId,
+  '3164500', // Schedule I App ID
+  branchKey,
+  managedEnvPath
+);
+```
+
+#### Benefits Achieved
+1. **Seamless User Experience**: Users don't need to re-enter credentials for each download
+2. **Security**: Credentials are retrieved from secure cache rather than being hardcoded
+3. **Error Prevention**: Clear error messages guide users to authenticate when needed
+4. **Integration**: Works seamlessly with existing credential caching system
+
+### Files Modified
+- **src/renderer/components/VersionManager/VersionManagerDialog.tsx**: Added credential retrieval and validation
+
+## Status: Version Manager Credential Integration Complete ✅
+
+The Version Manager dialog now properly retrieves cached Steam credentials before calling `downloadBranchVersion`. Users receive clear guidance when credentials are not available, and the download process uses cached credentials for seamless operation.
+
+## Path Validation and File System Consistency Improvements (2025-01-10) ✅
+
+### Completed Tasks (Security and Consistency Improvements)
+
+#### 1. Secure Path Validation Implementation ✅
+- **pathUtils.ts**: Updated `validatePath` function to use secure path normalization
+  - Replaced naive prefix matching with `path.resolve()` for proper path resolution
+  - Added boundary checking to ensure `resolvedTarget` starts with `resolvedManaged + path.sep` or equals exactly `resolvedManaged`
+  - Added error handling for path resolution failures
+  - Prevents path traversal attacks and ensures proper path containment
+
+#### 2. File System Consistency Refactoring ✅
+- **pathUtils.ts**: Refactored to use `fs-extra` consistently like other main process modules
+  - Replaced `import * as fs from 'fs/promises'` with `import * as fs from 'fs-extra'`
+  - Updated `fs.mkdir()` calls to use `fs.ensureDir()` for better consistency
+  - Maintained compatibility with existing `fs.readdir()` and `fs.stat()` operations
+  - Aligned with other main process modules that use `fs-extra`
+
+### Technical Implementation Details
+
+#### Secure Path Validation
+```typescript
+export function validatePath(managedEnvironmentPath: string, targetPath: string): boolean {
+  try {
+    const resolvedManaged = path.resolve(managedEnvironmentPath);
+    const resolvedTarget = path.resolve(targetPath);
+    
+    // Check if resolved target starts with resolved managed path + separator
+    // or equals exactly the managed path
+    return resolvedTarget === resolvedManaged || 
+           resolvedTarget.startsWith(resolvedManaged + path.sep);
+  } catch (error) {
+    // If path resolution fails, the path is invalid
+    return false;
+  }
+}
+```
+
+#### File System Consistency
+- **Before**: Mixed usage of `fs/promises` and `fs-extra` across modules
+- **After**: Consistent use of `fs-extra` throughout main process modules
+- **Benefits**: Better feature set, consistent API, and improved maintainability
+
+### Security Improvements
+
+#### Path Validation Security
+1. **Path Traversal Prevention**: `path.resolve()` prevents `../` and other traversal attacks
+2. **Boundary Enforcement**: Ensures target paths are properly contained within managed environment
+3. **Error Handling**: Graceful handling of invalid paths prevents application crashes
+4. **Cross-Platform**: Works correctly across Windows, macOS, and Linux path separators
+
+#### Benefits Achieved
+1. **Security**: Prevents path traversal attacks and unauthorized file access
+2. **Consistency**: All main process modules now use the same file system library
+3. **Maintainability**: Unified file system API makes code easier to maintain
+4. **Reliability**: Better error handling and path resolution
+5. **Cross-Platform**: Consistent behavior across different operating systems
+
+### Files Modified
+- **src/main/utils/pathUtils.ts**: Updated path validation and file system imports
+
+## Status: Path Validation and File System Consistency Improvements Complete ✅
+
+The path validation system now uses secure normalization to prevent path traversal attacks, and the file system operations are consistent across all main process modules using `fs-extra`. These improvements enhance both security and maintainability of the application.
+
+## Version Migration Service Steam Library Detection Enhancement (2025-01-10) ✅
+
+### Completed Tasks (Version Migration Service Enhancement)
+
+#### 1. Steam Library Detection at Method Start ✅
+- **VersionMigrationService.ts**: Added Steam library detection at the start of `detectLegacyInstallations` method
+- **Logic**: Checks if Steam libraries are detected, and if not, calls `detectSteamLibraries()` to ensure libraries are available
+- **Implementation**: Added check `if ((await this.steamService.getSteamLibraries()).length === 0)` before proceeding with legacy installation detection
+
+#### 2. Optional App Manifest Parsing from Config ✅
+- **VersionMigrationService.ts**: Added optional parsing of app manifest from configured Steam library path
+- **Configuration Integration**: Retrieves `steamLibraryPath` from `ConfigService.getConfig()`
+- **Manifest Parsing**: Attempts to parse app manifest for Schedule I (App ID: 3164500) from the configured path
+- **Error Handling**: Graceful error handling with console warnings if manifest parsing fails
+
+### Technical Implementation Details
+
+#### Steam Library Detection Enhancement
+```typescript
+// Ensure Steam libraries are detected before proceeding
+if ((await this.steamService.getSteamLibraries()).length === 0) {
+  await this.steamService.detectSteamLibraries();
+}
+```
+
+#### Optional App Manifest Parsing
+```typescript
+// Optionally attempt to parse app manifest from configured Steam library path
+const config = this.configService.getConfig();
+if (config.steamLibraryPath && config.steamLibraryPath.trim() !== '') {
+  try {
+    console.log(`Attempting to parse app manifest from configured path: ${config.steamLibraryPath}`);
+    await this.steamService.parseAppManifest('3164500', config.steamLibraryPath);
+    console.log('Successfully parsed app manifest from configured path');
+  } catch (error) {
+    console.warn('Failed to parse app manifest from configured Steam library path:', error);
+  }
+}
+```
+
+### Benefits Achieved
+
+1. **Reliability**: Ensures Steam libraries are detected before attempting legacy installation detection
+2. **Configuration Integration**: Leverages existing Steam library path configuration
+3. **Manifest Validation**: Validates that the configured Steam library path contains Schedule I
+4. **Error Resilience**: Graceful handling of Steam library detection and manifest parsing failures
+5. **Debugging**: Enhanced logging for troubleshooting Steam library and manifest issues
+
+### Files Modified
+- **src/main/services/VersionMigrationService.ts**: Added Steam library detection and optional manifest parsing
+
+## Status: Version Migration Service Steam Library Detection Enhancement Complete ✅
+
+The Version Migration Service now ensures Steam libraries are detected before proceeding with legacy installation detection and optionally validates the configured Steam library path by attempting to parse the Schedule I app manifest. This improves reliability and provides better debugging information for Steam-related operations.
+
+## PathUtils listBranchVersions Enhancement (2025-01-10) ✅
+
+### Completed Tasks (PathUtils Enhancement)
+
+#### 1. Enhanced Directory Name Parsing ✅
+- **pathUtils.ts**: Updated `listBranchVersions` function to properly parse directory names based on prefixes
+- **build_ Prefix**: When directory name starts with `build_`, extracts buildId by removing prefix
+- **manifest_ Prefix**: When directory name starts with `manifest_`, extracts manifestId and sets derived buildId
+- **Legacy Support**: Maintains fallback for legacy or unknown naming conventions
+
+#### 2. Improved BranchVersionInfo Structure ✅
+- **buildId Field**: Properly set based on directory name parsing logic
+- **manifestId Field**: Set when directory uses manifest_ prefix naming convention
+- **Path Preservation**: Maintains original path structure as requested
+- **Type Safety**: Full TypeScript support with proper field assignments
+
+### Technical Implementation Details
+
+#### Directory Name Parsing Logic
+```typescript
+let buildId: string;
+let manifestId: string | undefined;
+
+if (entry.name.startsWith('build_')) {
+  buildId = entry.name.replace('build_', '');
+} else if (entry.name.startsWith('manifest_')) {
+  manifestId = entry.name.replace('manifest_', '');
+  // Set derived buildId only when known - for now we'll leave it as the manifest ID
+  // This can be enhanced later when we have a mapping system
+  buildId = entry.name; // Keep original name for now
+} else {
+  // Fallback for legacy or unknown naming conventions
+  buildId = entry.name;
+}
+```
+
+#### BranchVersionInfo Structure
+- **buildId**: Extracted from directory name based on prefix logic
+- **manifestId**: Set when manifest_ prefix is detected
+- **downloadDate**: Preserved from directory stats
+- **sizeBytes**: Calculated directory size
+- **isActive**: Set by caller based on configuration
+- **path**: Maintained as-is per requirements
+
+### Benefits Achieved
+
+1. **Flexible Naming**: Supports both build_ and manifest_ prefix naming conventions
+2. **Backward Compatibility**: Maintains support for legacy directory structures
+3. **Type Safety**: Proper TypeScript interfaces with optional manifestId field
+4. **Future Extensibility**: Ready for enhanced buildId derivation from manifestId
+5. **Path Preservation**: Maintains original path structure as requested
+
+### Files Modified
+- **src/main/utils/pathUtils.ts**: Enhanced listBranchVersions function with improved directory name parsing
+
+## Status: PathUtils listBranchVersions Enhancement Complete ✅
+
+The `listBranchVersions` function now properly parses directory names based on their prefixes, setting buildId and manifestId fields appropriately while maintaining backward compatibility with legacy naming conventions. The path structure is preserved as requested, and the implementation is ready for future enhancements to derive buildId from manifestId when mapping systems are available.
+
+## Placeholder Reconciliation Implementation (2025-01-10) ✅
+
+### Completed Tasks (Placeholder Reconciliation)
+
+#### 1. ConfigService Reconciliation Method ✅
+- **ConfigService.ts**: Added `reconcilePlaceholdersAfterMigration` method (lines 464-574)
+- **Purpose**: Replaces entries where `manifestId===buildId` with real manifest IDs discovered by VersionMigrationService
+- **Functionality**: Cleans up obsolete keys and updates active manifest references
+- **Error Handling**: Comprehensive error handling with detailed logging and result tracking
+
+#### 2. Key Features Implementation ✅
+- **Placeholder Detection**: Identifies entries where `manifestId === buildId` (temporary placeholders)
+- **Manifest ID Replacement**: Replaces placeholder entries with real manifest IDs from migration service
+- **Obsolete Key Cleanup**: Removes obsolete keys that no longer correspond to real manifest IDs
+- **Active Manifest Updates**: Updates active manifest references when placeholders are replaced
+
+#### 3. Integration with VersionMigrationService ✅
+- **Method Signature**: `async reconcilePlaceholdersAfterMigration(manifestMappings: Record<string, Record<string, string>>)`
+- **Return Type**: `Promise<{success: boolean, reconciledCount: number, errors: string[]}>`
+- **Usage Pattern**: Called after VersionMigrationService completes migration process
+- **Data Flow**: Processes manifest mappings from migration service to update configuration
+
+### Technical Implementation Details
+
+#### Reconciliation Process
+1. **Placeholder Detection**: Scans `branchManifestVersions` for entries where `manifestId === buildId`
+2. **Manifest ID Mapping**: Uses provided mappings to find real manifest IDs for each build ID
+3. **Entry Replacement**: Creates new entries with real manifest IDs and removes placeholders
+4. **Active Manifest Updates**: Updates `activeManifestPerBranch` references
+5. **Obsolete Key Cleanup**: Removes keys that no longer correspond to real manifest IDs
+6. **Configuration Persistence**: Saves updated configuration to storage
+
+#### Error Handling
+- **Missing Mappings**: Logs warnings when no real manifest ID is found for a build ID
+- **Configuration Errors**: Handles configuration access and update errors gracefully
+- **Result Tracking**: Returns detailed success/failure information with counts and error messages
+
+### Benefits Achieved
+
+1. **Clean Configuration**: Removes temporary placeholder entries after migration
+2. **Data Integrity**: Ensures manifest IDs are accurate and up-to-date
+3. **Performance**: Eliminates obsolete keys that could cause confusion
+4. **Reliability**: Comprehensive error handling and logging
+5. **Integration**: Seamlessly works with existing VersionMigrationService
+
+### Files Modified
+- **src/main/services/ConfigService.ts**: Added `reconcilePlaceholdersAfterMigration` method
+- **memories/placeholder-reconciliation-implementation.md**: Created detailed implementation documentation
+
+## Status: Placeholder Reconciliation Implementation Complete ✅
+
+The ConfigService now includes a comprehensive method to reconcile placeholders after migration, replacing temporary entries with real manifest IDs and cleaning up obsolete keys. This ensures clean configuration state and data integrity after the migration process completes.

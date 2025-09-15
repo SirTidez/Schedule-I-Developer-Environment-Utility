@@ -1,7 +1,28 @@
 export interface BranchBuildInfo {
   buildId: string;
   updatedTime: string; // ISO string format
+  sizeBytes?: number; // Optional size in bytes
+  downloadDate?: string; // ISO string format when downloaded
+  isActive?: boolean; // Whether this is the currently active build
 }
+
+export interface InstalledDepotInfo {
+  depotId: string;
+  manifestId: string;
+  size?: number; // Size in bytes
+  lastUpdated?: number; // Unix timestamp
+}
+
+export interface BranchVersionInfo {
+  buildId?: string; // Build ID for Steam copy installations
+  manifestId?: string; // Manifest ID for DepotDownloader installations
+  downloadDate: string; // ISO string format
+  sizeBytes?: number; // Size in bytes
+  isActive: boolean; // Whether this is the currently active build
+  path: string; // Full path to the version directory
+}
+
+export type VersionIdentifier = string; // Can be either buildId or manifestId
 
 export interface DevEnvironmentConfig {
   steamLibraryPath: string;
@@ -9,7 +30,13 @@ export interface DevEnvironmentConfig {
   managedEnvironmentPath: string;
   selectedBranches: string[];
   installedBranch: string | null;
-  branchBuildIds: Record<string, BranchBuildInfo>;
+  branchBuildIds: Record<string, BranchBuildInfo>; // Legacy - kept for migration
+  branchVersions: Record<string, Record<string, BranchVersionInfo>>; // New multi-version structure
+  branchManifestVersions?: Record<string, Record<string, BranchVersionInfo>>; // Manifest ID based versions
+  userAddedVersions: Record<string, any[]>; // User-added versions by branch key
+  activeBuildPerBranch: Record<string, string>; // Maps branch name to active build ID
+  activeManifestPerBranch?: Record<string, string>; // Maps branch name to active manifest ID
+  maxRecentBuilds: number; // Number of recent builds to show (default: 10)
   customLaunchCommands: Record<string, string>;
   lastUpdated: string; // ISO string format
   configVersion: string;
@@ -36,6 +63,7 @@ export interface AppManifest {
   name: string;
   state: number;
   lastUpdated: number;
+  installedDepots?: Record<string, InstalledDepotInfo>; // Maps depot ID to depot info
 }
 
 export interface BranchInfo {
@@ -48,6 +76,10 @@ export interface BranchInfo {
   size?: string;
   needsUpdate?: boolean;
   steamBranchKey?: string;
+  // Multi-version support
+  availableVersions: Array<{buildId: string, date: string, sizeBytes?: number}>; // Available from Steam
+  activeVersion: string; // Currently active build ID
+  installedVersions: number; // Count of installed versions
 }
 
 export interface SteamGameInfo {
@@ -100,4 +132,41 @@ export interface SteamUpdateNotification {
   updateInfo?: SteamUpdateInfo; // Associated update information
   timestamp: Date; // When notification was created
   dismissed?: boolean; // Whether user has dismissed notification
+}
+
+export interface DepotInfo {
+  depotId: string; // Steam depot ID
+  manifestId: string; // Manifest ID for this depot
+  name?: string; // Human-readable depot name
+  size?: number; // Depot size in bytes
+}
+
+export interface RecentBuildInfo {
+  buildId: string; // Steam build ID
+  manifestId?: string; // Primary manifest ID for the build
+  changenumber: number; // Steam changenumber
+  timeUpdated: number; // Unix timestamp when build was updated
+  description?: string; // Build description if available
+  isCurrent: boolean; // Whether this is the current build for the branch
+  depots?: DepotInfo[]; // Depot and manifest info for the build
+}
+
+export interface RecentBuildsResult {
+  success: boolean; // Whether the operation was successful
+  builds?: RecentBuildInfo[]; // Array of recent builds
+  error?: string; // Error message if operation failed
+  historyAvailable: boolean; // Whether build history is available from Steam
+  maxCount: number; // Maximum number of builds requested
+  actualCount: number; // Actual number of builds returned
+}
+
+export interface ManifestInfo {
+  manifestId: string;
+  buildId: string;
+}
+
+export interface DownloadManifestsResult {
+  success: boolean; // Whether the operation was successful
+  manifests?: Record<string, ManifestInfo>; // Manifest info by branch name
+  error?: string; // Error message if operation failed
 }

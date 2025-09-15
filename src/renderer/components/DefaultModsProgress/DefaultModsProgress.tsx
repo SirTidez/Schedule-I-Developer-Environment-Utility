@@ -74,7 +74,7 @@ const DefaultModsProgress: React.FC = () => {
 
       for (const branchName of defaultModsData.selectedBranches) {
         const branchInfo = getBranchInfo(branchName);
-        const branchPath = `${defaultModsData.managedEnvironmentPath}/branches/${branchInfo.folderName}`;
+        const branchPath = await window.electronAPI.pathUtils.getBranchBasePath(defaultModsData.managedEnvironmentPath, branchInfo.folderName);
         
         addTerminalLog(`Processing ${branchInfo.name} branch (${branchInfo.compilationType})...`);
         setCurrentOperation(`Installing to ${branchInfo.name} (${branchInfo.compilationType})`);

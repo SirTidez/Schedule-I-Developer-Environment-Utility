@@ -1,0 +1,7 @@
+{
+  "enablePromptCompletion": true,
+  "fileFiltering": {
+    "respectGitIgnore": false
+  },
+  "shouldUseNodePtyShell": true
+}

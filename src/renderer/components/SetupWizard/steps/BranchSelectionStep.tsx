@@ -10,7 +10,7 @@ interface BranchInfo {
 
 interface BranchSelectionStepProps {
   steamLibraryPath: string;
-  onBranchesSelected: (branches: string[]) => void;
+  onBranchesSelected: (branches: string[], descriptions?: Record<string, string>) => void;
   selectedBranches?: string[];
 }
 
@@ -25,6 +25,7 @@ const BranchSelectionStep: React.FC<BranchSelectionStepProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>(selectedBranches);
   const [installedBranch, setInstalledBranch] = useState<string | null>(null);
+  const [customDescriptions, setCustomDescriptions] = useState<Record<string, string>>({});
 
   // Define the available Schedule I branches
   const availableBranches = [
@@ -78,7 +79,18 @@ const BranchSelectionStep: React.FC<BranchSelectionStepProps> = ({
       : [...selected, branchName];
     
     setSelected(newSelected);
-    onBranchesSelected(newSelected);
+    onBranchesSelected(newSelected, customDescriptions);
+  };
+
+  const handleDescriptionChange = (branchName: string, description: string) => {
+    const newDescriptions = { ...customDescriptions };
+    if (description.trim()) {
+      newDescriptions[branchName] = description.trim();
+    } else {
+      delete newDescriptions[branchName];
+    }
+    setCustomDescriptions(newDescriptions);
+    onBranchesSelected(selected, newDescriptions);
   };
 
   const formatDate = (timestamp: number) => {
@@ -137,30 +149,50 @@ const BranchSelectionStep: React.FC<BranchSelectionStepProps> = ({
                       : 'border-gray-600 bg-gray-800 hover:border-gray-500'
                   }`}
                 >
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(branch.name)}
-                      onChange={() => handleBranchToggle(branch.name)}
-                      className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <h5 className="font-medium">{displayName}</h5>
-                        {branch.isInstalled && (
-                          <div className="flex items-center space-x-1">
-                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                            <span className="text-xs text-green-400">Currently Installed</span>
-                          </div>
-                        )}
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(branch.name)}
+                        onChange={() => handleBranchToggle(branch.name)}
+                        className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h5 className="font-medium">{displayName}</h5>
+                          {branch.isInstalled && (
+                            <div className="flex items-center space-x-1">
+                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              <span className="text-xs text-green-400">Currently Installed</span>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-400">{description}</p>
                       </div>
-                      <p className="text-sm text-gray-400">{description}</p>
+                      <div className="text-right">
+                        <div className={`w-2 h-2 rounded-full ${
+                          branch.isAvailable ? 'bg-green-500' : 'bg-red-500'
+                        }`}></div>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <div className={`w-2 h-2 rounded-full ${
-                        branch.isAvailable ? 'bg-green-500' : 'bg-red-500'
-                      }`}></div>
-                    </div>
+                    
+                    {selected.includes(branch.name) && (
+                      <div className="ml-7">
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Custom Description (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={customDescriptions[branch.name] || ''}
+                          onChange={(e) => handleDescriptionChange(branch.name, e.target.value)}
+                          placeholder={`Enter a custom description for ${displayName}`}
+                          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          This description will be used to identify this installation in the Version Management window.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

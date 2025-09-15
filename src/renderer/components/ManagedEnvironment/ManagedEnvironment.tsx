@@ -7,11 +7,13 @@ import { useUpdateService } from '../../hooks/useUpdateService';
 import DefaultModsDialog from '../DefaultModsDialog/DefaultModsDialog';
 import SettingsDialog from '../Settings/SettingsDialog';
 import { UpdateDialog } from '../UpdateDialog/UpdateDialog';
+import { VersionManagerDialog } from '../VersionManager/VersionManagerDialog';
 
 interface BranchInfo {
   name: string;
+  folderName: string; // The folder name used in the filesystem (e.g., 'main-branch', 'alternate-beta-branch')
   path: string;
-  buildId: number;
+  buildId: number | string; // Can be numeric (Steam copy) or timestamp string (DepotDownloader)
   lastUpdated: number;
   isInstalled: boolean;
   needsRepair?: boolean;
@@ -19,6 +21,12 @@ interface BranchInfo {
   needsUpdate: boolean;
   steamBranchKey: string; // The actual Steam branch key (public, beta, alternative, alternative_beta)
   remoteBuildId?: number;
+  // Multi-version support
+  availableVersions: Array<{buildId: string, date: string, sizeBytes?: number}>;
+  activeVersion: string;
+  installedVersions: number;
+  // Steam version info
+  steamManifestId?: string; // Latest manifest ID from Steam API
 }
 
 const ManagedEnvironment: React.FC = () => {
@@ -37,6 +45,8 @@ const ManagedEnvironment: React.FC = () => {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [hideUpdateUntilNextRelease, setHideUpdateUntilNextRelease] = useState(false);
   const [hasCheckedForUpdates, setHasCheckedForUpdates] = useState(false);
+  const [showVersionManager, setShowVersionManager] = useState(false);
+  const [selectedBranchForVersionManager, setSelectedBranchForVersionManager] = useState<BranchInfo | null>(null);
   // Inline Steam login in the Steam Session card (no separate section)
   const [loginUser, setLoginUser] = useState('');
   const [loginPass, setLoginPass] = useState('');
@@ -46,6 +56,7 @@ const ManagedEnvironment: React.FC = () => {
   const [ddPercent, setDdPercent] = useState<number>(0);
   const [ddActive, setDdActive] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  
   const handleCancelDepotDownload = async (branch: BranchInfo) => {
     try {
       const res = await window.electronAPI.depotdownloader.cancel();
@@ -132,6 +143,8 @@ const ManagedEnvironment: React.FC = () => {
       const branchInfos: BranchInfo[] = [];
 
       // Fetch latest branch build IDs via Steam (node-steam-user)
+      // Note: This now uses cached data to reduce resource usage - Steam API calls
+      // are cached for 5 minutes to avoid repeated expensive API requests
       let latestBranchBuilds: Record<string, string> = {};
       let currentSteamBranchKey = '';
       try {
@@ -145,17 +158,39 @@ const ManagedEnvironment: React.FC = () => {
       }
 
       for (const branch of allBranches) {
-        const branchPath = `${config.managedEnvironmentPath}\\branches\\${branch.folderName}`;
+        const branchPath = await window.electronAPI.pathUtils.getBranchBasePath(config.managedEnvironmentPath, branch.folderName);
         const dirExists = await checkFileExists(branchPath);
-        const exePath = `${branchPath}\\Schedule I.exe`;
-        const exeExists = await checkFileExists(exePath);
+        
+        // Get active version from config (prioritize manifest over build)
+        const activeManifestId = config.activeManifestPerBranch?.[branch.folderName];
+        const activeBuildId = config.activeBuildPerBranch?.[branch.folderName];
+        const buildId = activeManifestId || activeBuildId || '';
+        const lastUpdated = config.branchBuildIds[branch.folderName] ? new Date(config.branchBuildIds[branch.folderName].updatedTime).getTime() / 1000 : Date.now() / 1000;
+        
+        // Check for active version and executable in version-specific structure
+        let exeExists = false;
+        let needsRepair = false;
+        
+        if (activeManifestId) {
+          // Check if executable exists in the active manifest version's subdirectory
+          const activeVersionPath = await window.electronAPI.pathUtils.getBranchVersionPath(config.managedEnvironmentPath, branch.folderName, activeManifestId, 'manifest');
+          const activeExePath = `${activeVersionPath}\\Schedule I.exe`;
+          exeExists = await checkFileExists(activeExePath);
+          needsRepair = dirExists && !exeExists; // Folder exists but active version's exe missing
+        } else if (activeBuildId) {
+          // Check if executable exists in the active build version's subdirectory
+          const activeVersionPath = await window.electronAPI.pathUtils.getBranchVersionPath(config.managedEnvironmentPath, branch.folderName, activeBuildId, 'build');
+          const activeExePath = `${activeVersionPath}\\Schedule I.exe`;
+          exeExists = await checkFileExists(activeExePath);
+          needsRepair = dirExists && !exeExists; // Folder exists but active version's exe missing
+        } else {
+          // Legacy check: look for exe directly in branch folder
+          const legacyExePath = `${branchPath}\\Schedule I.exe`;
+          exeExists = await checkFileExists(legacyExePath);
+          needsRepair = dirExists && !exeExists; // Folder exists but exe missing
+        }
+        
         const isInstalled = !!exeExists; // Only installed if executable exists
-        const needsRepair = !!dirExists && !exeExists; // Folder exists but exe missing
-
-        // Get build ID from config if available
-        const buildInfo = config.branchBuildIds[branch.folderName];
-        const buildId = buildInfo ? parseInt(buildInfo.buildId) : 0;
-        const lastUpdated = buildInfo ? new Date(buildInfo.updatedTime).getTime() / 1000 : Date.now() / 1000;
 
         // Determine update status vs Steam (node-steam-user) for this branch key
         let needsUpdate = false;
@@ -163,14 +198,100 @@ const ManagedEnvironment: React.FC = () => {
         const remoteBuildStr = latestBranchBuilds[branch.steamBranchKey] || '';
         if (remoteBuildStr) {
           remoteBuildIdNum = parseInt(remoteBuildStr);
-          if (buildId > 0) {
+          
+          // For manifest-based installations (DepotDownloader), we don't compare build IDs for updates
+          // For build-based installations (copy), we compare build IDs
+          if (activeManifestId) {
+            // DepotDownloader installation - skip build ID comparison for now
+            // TODO: Implement manifest-based update detection if needed
+            needsUpdate = false;
+          } else if (buildId && typeof buildId === 'string' && buildId.includes('/')) {
+            // DepotDownloader timestamp format (MM/DD/YYYY HH:MM:SS) - skip comparison
+            needsUpdate = false;
+          } else if (buildId && typeof buildId === 'number' && buildId > 0) {
+            // Copy installation - use numeric build ID comparison
             needsUpdate = remoteBuildIdNum > buildId;
-            console.log(`Branch ${branch.name}: stored=${buildId}, remote=${remoteBuildIdNum}, needsUpdate=${needsUpdate}`);
+          } else if (buildId && typeof buildId === 'string' && !isNaN(Number(buildId))) {
+            // String buildId that can be parsed as number
+            const numericBuildId = Number(buildId);
+            needsUpdate = remoteBuildIdNum > numericBuildId;
           }
+        }
+
+        // Load version information for multi-version support
+        let availableVersions: Array<{buildId: string, date: string, sizeBytes?: number}> = [];
+        let activeVersion = '';
+        let installedVersions = 0;
+        let steamManifestId = '';
+
+        try {
+          // Get available versions from Steam
+          const available = await window.electronAPI.steam.listBranchBuilds(branch.steamBranchKey, 10);
+          availableVersions = available.map((v: any) => ({
+            buildId: v.buildId,
+            date: v.date,
+            sizeBytes: v.sizeBytes
+          }));
+
+          // Get installed versions (both build and manifest based)
+          const installed = await window.electronAPI.steam.getInstalledVersions(branch.folderName);
+          installedVersions = installed.length;
+
+          // Find active version from config (prioritize manifest over build)
+          const activeManifestId = config.activeManifestPerBranch?.[branch.folderName];
+          const activeBuildId = config.activeBuildPerBranch?.[branch.folderName];
+          
+          if (activeManifestId) {
+            activeVersion = `manifest_${activeManifestId}`;
+          } else if (activeBuildId) {
+            activeVersion = `build_${activeBuildId}`;
+          } else {
+            activeVersion = '';
+          }
+
+          // Get latest manifest ID from Steam API for this branch
+          try {
+            const depotManifests = await window.electronAPI.steamBranch.getDepotManifestsForBranch(branch.steamBranchKey);
+            if (depotManifests?.success && depotManifests.depots && depotManifests.depots.length > 0) {
+              // Find the primary depot manifest (assuming depot 3164501 is the main one)
+              const primaryDepot = depotManifests.depots.find((d: any) => d.depotId === '3164501');
+              if (primaryDepot) {
+                steamManifestId = primaryDepot.manifestId;
+              } else if (depotManifests.depots.length > 0) {
+                // Fallback to first depot if primary not found
+                steamManifestId = depotManifests.depots[0].manifestId;
+              }
+            } else {
+              // If no depot manifests available, try to get build ID as fallback
+              console.warn(`No depot manifests found for ${branch.name} (${branch.steamBranchKey}), trying build ID fallback`);
+              try {
+                const buildIdResult = await window.electronAPI.steamBranch.getBranchBuildId(branch.steamBranchKey);
+                if (buildIdResult?.success && buildIdResult.buildId) {
+                  steamManifestId = `Build ${buildIdResult.buildId}`;
+                }
+              } catch (buildIdErr) {
+                console.warn(`Failed to get build ID for ${branch.name}:`, buildIdErr);
+              }
+            }
+          } catch (manifestErr) {
+            console.warn(`Failed to get manifest ID for ${branch.name}:`, manifestErr);
+            // Try build ID as fallback
+            try {
+              const buildIdResult = await window.electronAPI.steamBranch.getBranchBuildId(branch.steamBranchKey);
+              if (buildIdResult?.success && buildIdResult.buildId) {
+                steamManifestId = `Build ${buildIdResult.buildId}`;
+              }
+            } catch (buildIdErr) {
+              console.warn(`Failed to get build ID fallback for ${branch.name}:`, buildIdErr);
+            }
+          }
+        } catch (err) {
+          console.warn(`Failed to load version info for ${branch.name}:`, err);
         }
 
         branchInfos.push({
           name: branch.name,
+          folderName: branch.folderName,
           path: branchPath,
           buildId: buildId,
           lastUpdated: lastUpdated,
@@ -179,7 +300,11 @@ const ManagedEnvironment: React.FC = () => {
           size: isInstalled ? '2.5 GB' : (needsRepair ? 'Unknown' : 'Not installed'),
           needsUpdate: needsUpdate,
           steamBranchKey: branch.steamBranchKey,
-          remoteBuildId: remoteBuildIdNum
+          remoteBuildId: remoteBuildIdNum,
+          availableVersions,
+          activeVersion,
+          installedVersions,
+          steamManifestId
         });
       }
 
@@ -188,6 +313,37 @@ const ManagedEnvironment: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to load branches');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadBranchManifest = async (branchFolderName: string, appId: string, ddPath: string | undefined): Promise<Record<string, { manifestId: string; buildId: string }>> => {
+    if (!config) throw new Error("Config not available");
+    try {
+      const credRes = await window.electronAPI?.credCache?.get?.();
+      const creds = credRes?.success ? credRes.credentials : null;
+      if (!creds) throw new Error("Credentials not available");
+      if (!config.managedEnvironmentPath) throw new Error('Managed Environment path not available');
+      
+      const branches = [branchFolderName];
+      
+      const res = await window.electronAPI.depotdownloader.downloadManifests(
+        ddPath || undefined,
+        creds.username,
+        creds.password,
+        branches,
+        appId,
+        config.managedEnvironmentPath
+      );
+
+
+      if (!res.success || !res.manifests) {
+        throw new Error(res?.error || 'Failed to download manifests');
+      }
+
+      return res.manifests;
+    } catch (err) {
+      console.error('Failed to download manifests:', err);
+      throw new Error(err instanceof Error ? err.message : 'Failed to download manifests');
     }
   };
 
@@ -221,37 +377,61 @@ const ManagedEnvironment: React.FC = () => {
             const appId = await window.electronAPI.steam.getScheduleIAppId();
             if (!appId) throw new Error('Could not determine Schedule I App ID');
 
+            if (!creds) throw new Error("Credentials not available");
+
+            if (!config.managedEnvironmentPath) throw new Error('Managed Environment path not available');
+            
             const ddPath = config.depotDownloaderPath || undefined;
             const branchId = branchInfo.steamBranchKey; // already mapped (public/beta/alternate/alternate-beta)
+            
+            // Download manifests first to get the latest manifest ID
+            const manifests = await downloadBranchManifest(branchInfo.folderName, appId, ddPath);
+            
+            // Get the manifest info for this branch
+            const branchFolderName = branchInfo.folderName;
+            
+            const manifestInfo = manifests[branchFolderName];
+            if (!manifestInfo) {
+              throw new Error(`No manifest information found for ${branchInfo.name} branch (folder: ${branchFolderName}). Available keys: ${Object.keys(manifests).join(', ')}`);
+            }
+            
+            const { manifestId, buildId } = manifestInfo;
 
-            const res = await window.electronAPI.depotdownloader.downloadBranch(
+            // Download the branch using the manifest ID
+            const res = await window.electronAPI.depotdownloader.downloadBranchVersionByManifest(
               ddPath,
               creds.username,
               creds.password,
-              branchInfo.path,
+              branchFolderName,
+              manifestId,
               appId,
-              branchId
+              config.managedEnvironmentPath             
             );
 
             if (!res?.success) {
               throw new Error(res?.error || 'DepotDownloader failed');
             }
 
-            // Fetch and store build ID via node-steam-user for the branch key
+            // Set the active manifest for this branch after successful download
             try {
-              const steamIdResp = await window.electronAPI.steamUpdate.getBranchBuildId(branchId);
-              const buildId = steamIdResp?.success ? steamIdResp.buildId : undefined;
-              const folderName = branchInfo.path.split('\\').pop() || branchInfo.name.toLowerCase().replace(/\s+/g, '-');
-              if (buildId) {
-                await window.electronAPI.config.setBuildIdForBranch(folderName, buildId);
-              }
-            } catch {}
+              await window.electronAPI.config.setActiveManifest(branchInfo.folderName, manifestId);
+            } catch (configErr) {
+              console.warn(`Failed to set active manifest for ${branchInfo.name}:`, configErr);
+            }
 
-            // Install MelonLoader into the branch root if enabled
+            // Install MelonLoader into the version-specific directory if enabled
             try {
               const cfg = await window.electronAPI.config.get();
               if (cfg?.autoInstallMelonLoader) {
-                const mlRes = await window.electronAPI.melonloader.install(branchInfo.path);
+                // Get the version-specific path for MelonLoader installation
+                const versionPath = await window.electronAPI.pathUtils.getBranchVersionPath(
+                  config.managedEnvironmentPath, 
+                  branchInfo.folderName, 
+                  manifestId, 
+                  'manifest'
+                );
+                
+                const mlRes = await window.electronAPI.melonloader.install(versionPath);
                 if (mlRes?.success) {
                   setToastMsg('MelonLoader installed');
                   setTimeout(() => setToastMsg(null), 4000);
@@ -261,6 +441,7 @@ const ManagedEnvironment: React.FC = () => {
                 }
               }
             } catch (e) {
+              console.warn('MelonLoader installation failed:', e);
               setToastMsg('MelonLoader install failed');
               setTimeout(() => setToastMsg(null), 4000);
             }
@@ -328,11 +509,17 @@ const ManagedEnvironment: React.FC = () => {
 
   const handlePlayBranch = async (branchInfo: BranchInfo) => {
     try {
-      // Find the executable in the branch directory
-      const executablePath = `${branchInfo.path}\\Schedule I.exe`;
+      // Find the executable in the active version directory
+      let executablePath: string;
       
-      console.log('Launching game from:', executablePath);
-      console.log('Branch info:', branchInfo);
+      if (branchInfo.activeVersion) {
+        // Use active version's executable (handles both manifest_ and build_ prefixed versions)
+        executablePath = `${branchInfo.path}\\${branchInfo.activeVersion}\\Schedule I.exe`;
+      } else {
+        // Legacy: look for exe directly in branch folder
+        executablePath = `${branchInfo.path}\\Schedule I.exe`;
+      }
+      
       
       // Check if the executable exists first
       const executableExists = await checkFileExists(executablePath);
@@ -343,19 +530,27 @@ const ManagedEnvironment: React.FC = () => {
       // Launch the game executable
       await window.electronAPI.shell.launchExecutable(executablePath);
       
-      console.log('Game launched successfully');
     } catch (error) {
       console.error('Failed to launch game:', error);
       setError(`Failed to launch game: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
-  const handleOpenBranchFolder = async (branchPath: string) => {
+  const handleOpenBranchFolder = async (branchInfo: BranchInfo) => {
     try {
+      // Determine which folder to open
+      let targetPath: string;
+      
+      if (branchInfo.activeVersion) {
+        // Open the active version folder (handles both manifest_ and build_ prefixed versions)
+        targetPath = `${branchInfo.path}\\${branchInfo.activeVersion}`;
+      } else {
+        // Legacy: open the branch root folder
+        targetPath = branchInfo.path;
+      }
+      
       // Convert forward slashes to backslashes for Windows compatibility
-      const normalizedPath = branchPath.replace(/\//g, '\\');
-      console.log('Opening folder:', normalizedPath);
-      console.log('Original path:', branchPath);
+      const normalizedPath = targetPath.replace(/\//g, '\\');
       
       // Check if the folder exists first
       const folderExists = await checkFileExists(normalizedPath);
@@ -364,7 +559,6 @@ const ManagedEnvironment: React.FC = () => {
       }
       
       await window.electronAPI.shell.openFolder(normalizedPath);
-      console.log('Folder opened successfully');
     } catch (error) {
       console.error('Failed to open folder:', error);
       setError(`Failed to open folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -439,9 +633,32 @@ const ManagedEnvironment: React.FC = () => {
     setShowUpdateDialog(false);
   };
 
+  const handleOpenVersionManager = (branch: BranchInfo) => {
+    setSelectedBranchForVersionManager(branch);
+    setShowVersionManager(true);
+  };
+
+  const handleVersionManagerClose = () => {
+    setShowVersionManager(false);
+    setSelectedBranchForVersionManager(null);
+  };
+
+  const handleVersionChange = async (version: { buildId?: string; manifestId?: string }) => {
+    if (!selectedBranchForVersionManager) return;
+    
+    try {
+      // The VersionManagerDialog already handles setting the active version
+      // Refresh config first to get latest active version data
+      await loadConfig();
+      // Then refresh branches to show updated active version
+      await loadBranches();
+    } catch (err) {
+      console.error('Failed to refresh after version change:', err);
+    }
+  };
+
   const handleLaunchBranch = (branchName: string) => {
     // This would launch the game from the specific branch
-    console.log('Launching branch:', branchName);
     // In a real implementation, this would launch the game executable
   };
 
@@ -627,15 +844,33 @@ const ManagedEnvironment: React.FC = () => {
                       <div className={`w-3 h-3 rounded-full ${
                         branch.needsRepair ? 'bg-orange-500' : (branch.isInstalled ? 'bg-green-500' : 'bg-red-500')
                       }`} title={branch.needsRepair ? 'Needs Repair' : (branch.isInstalled ? 'Installed' : 'Not installed')}></div>
+                      {/* Version Manager Button */}
+                      <button
+                        onClick={() => handleOpenVersionManager(branch)}
+                        className="p-1 text-gray-400 hover:text-white transition-colors"
+                        title="Manage versions"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
                   
                   <div className="space-y-2 mb-4">
                     <p className="text-sm text-gray-400">
-                      Build ID: <span className="text-gray-300">{branch.buildId || 'Unknown'}</span>
+                      Steam Version: <span className="text-gray-300">{branch.steamManifestId || 'Not Available'}</span>
+                    </p>
+                    {branch.buildId && (
+                      <p className="text-sm text-gray-400">
+                        Build ID: <span className="text-gray-300">{branch.buildId}</span>
+                      </p>
+                    )}
+                    <p className="text-sm text-gray-400">
+                      Installed Versions: <span className="text-gray-300">{branch.installedVersions}</span>
                     </p>
                     <p className="text-sm text-gray-400">
-                      Steam Build: <span className="text-gray-300">{branch.remoteBuildId ?? 'Unknown'}</span>
+                      Available Versions: <span className="text-gray-300">{branch.availableVersions.length}</span>
                     </p>
                     <p className="text-sm text-gray-400">
                       Last Updated: <span className="text-gray-300">
@@ -708,7 +943,7 @@ const ManagedEnvironment: React.FC = () => {
                             {installingBranch === branch.name ? (branch.needsRepair ? 'Repairing...' : 'Reinstalling...') : (branch.needsRepair ? 'Repair' : 'Reinstall')}
                           </button>
                           <button
-                            onClick={() => handleOpenBranchFolder(branch.path)}
+                            onClick={() => handleOpenBranchFolder(branch)}
                             className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white transition-colors flex items-center justify-center space-x-1"
                             title="Open branch folder in file explorer"
                           >
@@ -870,6 +1105,17 @@ const ManagedEnvironment: React.FC = () => {
         />
       )}
       <SettingsDialog isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      
+      {/* Version Manager Dialog */}
+      {selectedBranchForVersionManager && (
+        <VersionManagerDialog
+          isOpen={showVersionManager}
+          onClose={handleVersionManagerClose}
+          branchName={selectedBranchForVersionManager.folderName}
+          branchKey={selectedBranchForVersionManager.steamBranchKey}
+          onVersionChange={handleVersionChange}
+        />
+      )}
     </div>
   );
 };

@@ -1,6 +1,6 @@
 {
   "name": "schedule-i-dev-environment",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Schedule I Developer Environment Utility - Electron Edition",
   "main": "dist/main/main/index.js",
   "scripts": {
@@ -14,7 +14,7 @@
     "start": "electron .",
     "start:main": "electron dist/main/main/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "clean": "rimraf dist dist-v2.1.0 dist-v2.1.0-2 dist-v2.1.1",
+    "clean": "rimraf dist dist-v2.1.0 dist-v2.1.0-2 dist-v2.1.1 dist-v2.2.0",
     "prepackage": "npm run clean && npm run build"
   },
   "keywords": [
@@ -30,7 +30,7 @@
     "appId": "com.schedulei.dev-environment",
     "productName": "Schedule I Developer Environment",
     "directories": {
-      "output": "dist-v2.1.1"
+      "output": "dist-v2.2.0"
     },
     "files": [
       "dist/**/*",
@@ -83,18 +83,20 @@
     "postcss": "^8.5.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "rimraf": "^5.0.5",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
-    "vite": "^7.1.5",
-    "rimraf": "^5.0.5"
+    "vite": "^7.1.5"
   },
   "dependencies": {
     "@types/react-router-dom": "^5.3.3",
     "electron-log": "^5.4.3",
     "electron-store": "^10.1.0",
+    "extract-zip": "^2.0.1",
     "fs-extra": "^11.3.1",
+    "lucide-react": "^0.544.0",
     "react-router-dom": "^7.8.2",
     "steam-user": "^5.2.3",
-    "extract-zip": "^2.0.1"
+    "vdf": "^0.0.2"
   }
 }

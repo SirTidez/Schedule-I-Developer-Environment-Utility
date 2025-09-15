@@ -8,6 +8,7 @@ interface SettingsDialogProps {
 const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose }) => {
   const [logRetentionCount, setLogRetentionCount] = useState<number>(50);
   const [diskSpaceThresholdGB, setDiskSpaceThresholdGB] = useState<number>(10);
+  const [maxRecentBuilds, setMaxRecentBuilds] = useState<number>(10);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [configDir, setConfigDir] = useState<string>('');
@@ -21,6 +22,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose }) => {
         const cfg = await window.electronAPI.config.get();
         setLogRetentionCount(Number(cfg?.logRetentionCount ?? 50));
         setDiskSpaceThresholdGB(Number(cfg?.diskSpaceThresholdGB ?? 10));
+        setMaxRecentBuilds(Number(cfg?.maxRecentBuilds ?? 10));
         setAutoInstallMelon(Boolean(cfg?.autoInstallMelonLoader ?? true));
         try {
           const cdir = await window.electronAPI.config.getConfigDir();
@@ -41,6 +43,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose }) => {
       await window.electronAPI.config.update({
         logRetentionCount: Math.max(1, Math.floor(logRetentionCount)),
         diskSpaceThresholdGB: Math.max(0, Math.floor(diskSpaceThresholdGB)),
+        maxRecentBuilds: Math.max(1, Math.min(50, Math.floor(maxRecentBuilds))),
         autoInstallMelonLoader: !!autoInstallMelon,
       });
       onClose();
@@ -116,6 +119,18 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose }) => {
               className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-xs text-gray-400 mt-1">Warn if free space is below this value at setup start.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Recent builds to show</label>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={maxRecentBuilds}
+              onChange={(e) => setMaxRecentBuilds(Number(e.target.value))}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">Number of recent builds to display in version manager (default: 10)</p>
           </div>
         </div>
 

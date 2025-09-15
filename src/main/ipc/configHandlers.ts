@@ -150,4 +150,117 @@ export function setupConfigHandlers() {
       throw error;
     }
   });
+
+  // Multi-version branch support handlers
+
+  ipcMain.handle('config:set-branch-version', async (event, branchName: string, buildId: string, versionInfo: any) => {
+    try {
+      configService.setBranchVersion(branchName, buildId, versionInfo);
+    } catch (error) {
+      console.error('Error setting branch version:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('config:get-branch-versions', async (event, branchName: string) => {
+    try {
+      return configService.getBranchVersions(branchName);
+    } catch (error) {
+      console.error('Error getting branch versions:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('config:set-active-build', async (event, branchName: string, buildId: string) => {
+    try {
+      configService.setActiveBuild(branchName, buildId);
+    } catch (error) {
+      console.error('Error setting active build:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('config:get-active-build', async (event, branchName: string) => {
+    try {
+      return configService.getActiveBuild(branchName);
+    } catch (error) {
+      console.error('Error getting active build:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('config:get-max-recent-builds', async () => {
+    try {
+      return configService.getMaxRecentBuilds();
+    } catch (error) {
+      console.error('Error getting max recent builds:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('config:set-max-recent-builds', async (event, count: number) => {
+    try {
+      configService.setMaxRecentBuilds(count);
+    } catch (error) {
+      console.error('Error setting max recent builds:', error);
+      throw error;
+    }
+  });
+
+  // User-added versions handlers
+  ipcMain.handle('config:set-user-added-versions', async (event, branchKey: string, versions: any[]) => {
+    try {
+      configService.setUserAddedVersions(branchKey, versions);
+    } catch (error) {
+      console.error('Error setting user-added versions:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('config:get-user-added-versions', async (event, branchKey: string) => {
+    try {
+      return configService.getUserAddedVersions(branchKey);
+    } catch (error) {
+      console.error('Error getting user-added versions:', error);
+      throw error;
+    }
+  });
+
+  // Manifest ID based version management handlers
+
+  ipcMain.handle('config:set-active-manifest', async (event, branchName: string, manifestId: string) => {
+    try {
+      configService.setActiveManifest(branchName, manifestId);
+    } catch (error) {
+      console.error('Error setting active manifest:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('config:get-active-manifest', async (event, branchName: string) => {
+    try {
+      return configService.getActiveManifest(branchName);
+    } catch (error) {
+      console.error('Error getting active manifest:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('config:set-branch-manifest-version', async (event, branchName: string, manifestId: string, versionInfo: any) => {
+    try {
+      configService.setBranchManifestVersion(branchName, manifestId, versionInfo);
+    } catch (error) {
+      console.error('Error setting branch manifest version:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('config:get-branch-manifest-versions', async (event, branchName: string) => {
+    try {
+      return configService.getBranchManifestVersions(branchName);
+    } catch (error) {
+      console.error('Error getting branch manifest versions:', error);
+      throw error;
+    }
+  });
 }

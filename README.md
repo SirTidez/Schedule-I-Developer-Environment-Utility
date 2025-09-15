@@ -1,6 +1,6 @@
 # Schedule I Developer Environment Utility - Electron Edition
 
-**Version 2.1.1** - DepotDownloader Integration & MelonLoader Auto-Install
+**Version 2.2.0** - Custom Description Management & Enhanced Version Control
 
 ## 🎮 What is Schedule I Developer Environment?
 
@@ -52,6 +52,12 @@ This is the Electron-based version of the Schedule I Developer Environment Utili
 - **Default Mods**: Install default mods to selected branches
 - **Branch Deletion**: Safe deletion of managed branch instances
 - **Configuration Management**: Persistent settings with validation
+
+### 🏷️ **Custom Description Management** (v2.2.0)
+- **Setup Wizard Enhancement**: Add custom descriptions when installing branches
+- **Version Manager**: Edit custom descriptions for installed builds
+- **Persistent Storage**: Descriptions are saved and persist across sessions
+- **Enhanced UX**: Better version identification and management
 
 ### 📥 **DepotDownloader Integration** (v2.1.1)
 - **Modern Steam Downloads**: Direct DepotDownloader integration replacing legacy SteamCMD
@@ -126,7 +132,7 @@ npm run start
 
 ### Build Output
 - **Development**: Built files go to `dist/` directory
-- **Packaging**: Packaged executables go to `dist-v2.1.1/` directory
+- **Packaging**: Packaged executables go to `dist-v2.2.0/` directory
 
 ### Development Workflow
 1. **Start Development**: Run `npm run dev` to start both processes
@@ -172,7 +178,7 @@ Schedule I Developer Environment Utility/
 │   └── preload/                  # Preload scripts
 │       └── index.ts              # Secure API exposure
 ├── dist/                         # Built application
-├── dist-v2.1.1/                 # Packaged executables (v2.1.1)
+├── dist-v2.2.0/                 # Packaged executables (v2.2.0)
 ├── dist-v2.0.3/                 # Packaged executables (v2.0.3)
 ├── dist-v2/                     # Packaged executables (legacy v2.0.0)
 ├── Assets/                       # Application assets and icons
@@ -188,16 +194,24 @@ Schedule I Developer Environment Utility/
 The application uses electron-builder for packaging with support for multiple platforms:
 
 ### **Windows**
-- **Portable Executable**: `Schedule I Developer Environment 2.1.1.exe`
-- **NSIS Installer**: `Schedule I Developer Environment Setup 2.1.1.exe`
+- **Portable Executable**: `Schedule I Developer Environment 2.2.0.exe`
+- **NSIS Installer**: `Schedule I Developer Environment Setup 2.2.0.exe`
 - **Architecture**: x64
 - **Digital Signing**: All executables are digitally signed
 
 ### **Package Directories**
-- **Current Version**: `dist-v2.1.1/` (v2.1.1 packages)
+- **Current Version**: `dist-v2.2.0/` (v2.2.0 packages)
 - **Previous Versions**: `dist-v2.0.3/` and `dist-v2/` (legacy packages)
 
-## 🆕 Recent Changes (v2.1.1)
+## 🆕 Recent Changes (v2.2.0)
+
+### **🏷️ Custom Description Management**
+- **Setup Wizard**: Added custom description input fields for branch installation
+- **Version Manager**: Added edit functionality for existing custom descriptions
+- **Persistent Storage**: Custom descriptions are saved and persist across sessions
+- **Enhanced UX**: Better version identification with user-friendly names
+
+## Previous Changes (v2.1.1)
 
 ### **🔒 Security Enhancements**
 - **Command Hardening**: Disabled shell execution for DepotDownloader spawns (uses argument arrays only)
