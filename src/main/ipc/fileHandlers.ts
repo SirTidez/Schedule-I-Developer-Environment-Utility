@@ -1,9 +1,52 @@
+/**
+ * File Operations IPC Handlers for Schedule I Developer Environment Utility
+ * 
+ * Provides IPC communication handlers for all file system operations including
+ * copying, directory management, file operations, and progress tracking.
+ * These handlers bridge the gap between the renderer process and file system
+ * operations in the main process, enabling secure file management.
+ * 
+ * Handled operations:
+ * - Game file copying with progress tracking
+ * - Directory creation and management
+ * - File existence checking
+ * - Text file operations
+ * - File listing and deletion
+ * - Legacy branch migration
+ * - Progress event broadcasting
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.2.0
+ */
+
 import { ipcMain } from 'electron';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import { getBranchVersionPath, ensureBranchVersionDirectory, detectLegacyBranchStructure, migrateLegacyBranch } from '../utils/pathUtils';
 
-export function setupFileHandlers() {
+/**
+ * Sets up all file operation-related IPC handlers
+ * 
+ * Registers handlers for file copying, directory management, file operations,
+ * and progress tracking. All handlers include proper error handling and
+ * progress event broadcasting for user feedback.
+ * 
+ * @returns void
+ */
+export function setupFileHandlers(): void {
+  /**
+   * Handler for copying game files with progress tracking
+   * 
+   * Copies all game files from the source path to the destination path,
+   * excluding Mods and Plugins folders at the root level. Provides
+   * real-time progress updates via IPC events.
+   * 
+   * @param event - The IPC event object for sending progress updates
+   * @param sourcePath - Source directory path containing game files
+   * @param destinationPath - Destination directory path for copied files
+   * @returns Promise<{success: boolean, error?: string}> Copy operation result
+   * @throws Error if source path doesn't exist or copy operation fails
+   */
   ipcMain.handle('file:copy-game', async (event, sourcePath: string, destinationPath: string) => {
     try {
       console.log(`Starting file copy from: ${sourcePath} to: ${destinationPath}`);

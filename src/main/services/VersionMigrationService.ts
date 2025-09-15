@@ -67,42 +67,18 @@ export class VersionMigrationService {
   }
 
   /**
-   * Detects legacy installations that use build ID based directory naming
+   * Detects legacy installations that use the old flat directory structure
    * 
-   * Scans the managed environment for directories using the old build_* naming
-   * convention and attempts to extract manifest IDs from Steam installations.
+   * Scans the managed environment for branch directories with files directly in them
+   * (old structure) and attempts to extract manifest IDs from appmanifest files.
+   * Only returns branches that actually need migration (no build_ or manifest_ subdirectories).
    * 
    * @param managedEnvironmentPath The managed environment root path
-   * @returns Promise<LegacyInstallation[]> Array of detected legacy installations
+   * @returns Promise<LegacyInstallation[]> Array of detected legacy installations that need migration
    */
   async detectLegacyInstallations(managedEnvironmentPath: string): Promise<LegacyInstallation[]> {
-    // @temp: Legacy migration temporarily disabled to prevent incorrect detection of new downloads.
-    // The logic was flagging freshly downloaded manifest-based directories as legacy.
-    // This needs to be revisited to correctly differentiate between actual legacy 
-    // build_* folders and modern manifest_* folders.
-    return [];
-
-    /*
     try {
       console.log('Detecting legacy installations in:', managedEnvironmentPath);
-      
-      // Ensure Steam libraries are detected before proceeding
-      if ((await this.steamService.getSteamLibraries()).length === 0) {
-        await this.steamService.detectSteamLibraries();
-      }
-      
-      // Optionally attempt to parse app manifest from configured Steam library path
-      // Note: config.steamLibraryPath should be the steamapps folder path, not the library root
-      const config = this.configService.getConfig();
-      if (config.steamLibraryPath && config.steamLibraryPath.trim() !== '') {
-        try {
-          console.log(`Attempting to parse app manifest from configured path: ${config.steamLibraryPath}`);
-          await this.steamService.parseAppManifest('3164500', config.steamLibraryPath);
-          console.log('Successfully parsed app manifest from configured path');
-        } catch (error) {
-          console.warn('Failed to parse app manifest from configured Steam library path:', error);
-        }
-      }
       
       const legacyInstallations: LegacyInstallation[] = [];
       const branchesPath = path.join(managedEnvironmentPath, 'branches');
@@ -122,67 +98,187 @@ export class VersionMigrationService {
         
         console.log(`Checking branch: ${branchName}`);
         
-        // Look for build_* directories
-        const versionDirs = await fs.readdir(branchPath, { withFileTypes: true });
+        // Check if this branch needs migration (has legacy flat structure AND no build_/manifest_ subdirectories)
+        const needsMigration = await this.branchNeedsMigration(branchPath);
         
-        for (const versionDir of versionDirs) {
-          if (!versionDir.isDirectory()) continue;
+        if (needsMigration) {
+          console.log(`Branch ${branchName} needs migration - has legacy flat structure`);
           
-          const versionType = detectVersionIdentifierType(versionDir.name);
+          // Look for appmanifest file in the branch directory
+          const manifestId = await this.extractManifestIdFromBranch(branchPath);
           
-          if (versionType === 'build') {
-            const buildId = versionDir.name.replace('build_', '');
-            const versionPath = path.join(branchPath, versionDir.name);
-            
-            console.log(`Found legacy installation: ${branchName}/${versionDir.name}`);
-            
-            // Try to get manifest ID from Steam installation
-            let manifestId: string | undefined;
-            try {
-              const steamLibraries = await this.steamService.getSteamLibraries();
-              
-              for (const libraryPath of steamLibraries) {
-                try {
-                  // libraryPath from getSteamLibraries() is already the steamapps folder path
-                  const manifest = await this.steamService.parseAppManifest('3164500', libraryPath);
-                  const primaryManifestId = this.steamService.getPrimaryManifestId(manifest);
-                  
-                  if (primaryManifestId) {
-                    manifestId = primaryManifestId;
-                    console.log(`Found manifest ID ${manifestId} for build ${buildId}`);
-                    break;
-                  }
-                } catch (error) {
-                  // Continue to next library
-                  continue;
-                }
-              }
-            } catch (error) {
-              console.warn(`Could not extract manifest ID for build ${buildId}:`, error);
-            }
+          if (manifestId) {
+            console.log(`Found manifest ID ${manifestId} for legacy branch ${branchName}`);
             
             legacyInstallations.push({
               branchName,
-              buildId,
-              path: versionPath,
+              buildId: manifestId, // Use manifest ID as build ID for migration
+              path: branchPath,
               manifestId
             });
+          } else {
+            console.warn(`No manifest ID found for legacy branch ${branchName}`);
+            
+            // Still add it but without manifest ID - user can retry after fixing Steam detection
+            legacyInstallations.push({
+              branchName,
+              buildId: 'unknown',
+              path: branchPath,
+              manifestId: undefined
+            });
           }
+        } else {
+          console.log(`Branch ${branchName} does not need migration - already has proper structure`);
         }
       }
       
-      console.log(`Found ${legacyInstallations.length} legacy installations`);
+      console.log(`Found ${legacyInstallations.length} branches that need migration`);
       return legacyInstallations;
       
     } catch (error) {
       console.error('Error detecting legacy installations:', error);
       return [];
     }
-    */
   }
 
   /**
-   * Migrates a single installation from build ID to manifest ID based naming
+   * Checks if a specific branch needs migration
+   * 
+   * A branch needs migration if:
+   * 1. It has files directly in the branch directory (legacy flat structure)
+   * 2. It does NOT have any build_ or manifest_ subdirectories
+   * 
+   * @param branchPath The branch directory path
+   * @returns Promise<boolean> True if the branch needs migration
+   */
+  private async branchNeedsMigration(branchPath: string): Promise<boolean> {
+    try {
+      const entries = await fs.readdir(branchPath, { withFileTypes: true });
+      
+      // Check if there are any files directly in the branch directory (legacy structure)
+      const hasDirectFiles = entries.some(entry => entry.isFile());
+      
+      // Check if there are any build_ or manifest_ subdirectories (new structure)
+      const hasVersionSubdirs = entries.some(entry => 
+        entry.isDirectory() && 
+        (entry.name.startsWith('build_') || entry.name.startsWith('manifest_'))
+      );
+      
+      // Need migration if: has direct files (legacy) AND no version subdirectories (not already migrated)
+      const needsMigration = hasDirectFiles && !hasVersionSubdirs;
+      
+      console.log(`Branch ${path.basename(branchPath)}: hasDirectFiles=${hasDirectFiles}, hasVersionSubdirs=${hasVersionSubdirs}, needsMigration=${needsMigration}`);
+      
+      return needsMigration;
+    } catch (error) {
+      console.error(`Error checking if branch needs migration: ${branchPath}`, error);
+      return false;
+    }
+  }
+
+
+  /**
+   * Extracts manifest ID from appmanifest file in a branch directory
+   * 
+   * @param branchPath The branch directory path
+   * @returns Promise<string | undefined> The manifest ID if found
+   */
+  private async extractManifestIdFromBranch(branchPath: string): Promise<string | undefined> {
+    try {
+      // Look for appmanifest_*.acf files in the branch directory
+      const entries = await fs.readdir(branchPath, { withFileTypes: true });
+      const manifestFiles = entries.filter(entry => 
+        entry.isFile() && entry.name.startsWith('appmanifest_') && entry.name.endsWith('.acf')
+      );
+
+      if (manifestFiles.length === 0) {
+        console.log(`No appmanifest files found in ${branchPath}`);
+        return undefined;
+      }
+
+      // Use the first manifest file found
+      const manifestFile = manifestFiles[0];
+      const manifestPath = path.join(branchPath, manifestFile.name);
+      
+      console.log(`Reading manifest file: ${manifestPath}`);
+      const manifestContent = await fs.readFile(manifestPath, 'utf-8');
+      
+      // Parse the manifest to extract manifest ID from InstalledDepots
+      const manifestId = this.parseManifestIdFromContent(manifestContent);
+      
+      if (manifestId) {
+        console.log(`Extracted manifest ID: ${manifestId}`);
+      } else {
+        console.warn(`Could not extract manifest ID from ${manifestPath}`);
+      }
+      
+      return manifestId;
+    } catch (error) {
+      console.error(`Error extracting manifest ID from ${branchPath}:`, error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Parses manifest ID from appmanifest content
+   * 
+   * @param content The appmanifest file content
+   * @returns string | undefined The manifest ID if found
+   */
+  private parseManifestIdFromContent(content: string): string | undefined {
+    try {
+      // Look for InstalledDepots section
+      const installedDepotsMatch = content.match(/"InstalledDepots"\s*\{([^}]+)\}/);
+      if (!installedDepotsMatch) {
+        console.log('No InstalledDepots section found in manifest');
+        return undefined;
+      }
+
+      const depotsContent = installedDepotsMatch[1];
+      
+      // Find depot blocks and extract manifest IDs
+      const depotMatches = depotsContent.match(/"(\d+)"\s*\{([^}]+)\}/g);
+      if (!depotMatches) {
+        console.log('No depot blocks found in InstalledDepots');
+        return undefined;
+      }
+
+      // Look for the primary depot (3164501) or use the first one found
+      for (const depotMatch of depotMatches) {
+        const depotIdMatch = depotMatch.match(/"(\d+)"/);
+        if (!depotIdMatch) continue;
+
+        const depotId = depotIdMatch[1];
+        const manifestMatch = depotMatch.match(/"manifest"\s+"([^"]+)"/);
+        
+        if (manifestMatch) {
+          const manifestId = manifestMatch[1];
+          console.log(`Found manifest ID ${manifestId} for depot ${depotId}`);
+          
+          // Prefer depot 3164501 (primary depot) if available
+          if (depotId === '3164501') {
+            return manifestId;
+          }
+        }
+      }
+
+      // If no primary depot found, return the first manifest ID found
+      for (const depotMatch of depotMatches) {
+        const manifestMatch = depotMatch.match(/"manifest"\s+"([^"]+)"/);
+        if (manifestMatch) {
+          return manifestMatch[1];
+        }
+      }
+
+      return undefined;
+    } catch (error) {
+      console.error('Error parsing manifest content:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Migrates a single installation from legacy flat structure to build_<manifest_id> structure
    * 
    * @param installation The legacy installation to migrate
    * @param onProgress Optional progress callback
@@ -193,13 +289,13 @@ export class VersionMigrationService {
     onProgress?: (progress: MigrationProgress) => void
   ): Promise<{success: boolean, error?: string}> {
     try {
-      console.log(`Migrating installation: ${installation.branchName}/${installation.buildId}`);
+      console.log(`Migrating installation: ${installation.branchName} (legacy flat structure)`);
       
       if (onProgress) {
         onProgress({
-          currentStep: `Migrating ${installation.branchName}/${installation.buildId}`,
+          currentStep: `Migrating ${installation.branchName} from legacy structure`,
           completedSteps: 0,
-          totalSteps: 3,
+          totalSteps: 4,
           currentInstallation: installation
         });
       }
@@ -207,24 +303,24 @@ export class VersionMigrationService {
       if (!installation.manifestId) {
         return {
           success: false,
-          error: `No manifest ID available for build ${installation.buildId}`
+          error: `No manifest ID available for branch ${installation.branchName}`
         };
       }
 
-      // Create new manifest-based directory path
-      const managedEnvironmentPath = path.dirname(path.dirname(installation.path));
+      // Create new build_<manifest_id> directory path
+      const managedEnvironmentPath = path.dirname(installation.path);
       const newPath = getBranchVersionPath(
         managedEnvironmentPath, 
         installation.branchName, 
         installation.manifestId,
-        'manifest'
+        'build' // Use 'build' prefix as requested by user
       );
 
       if (onProgress) {
         onProgress({
-          currentStep: `Creating manifest directory: manifest_${installation.manifestId}`,
+          currentStep: `Creating build directory: build_${installation.manifestId}`,
           completedSteps: 1,
-          totalSteps: 3,
+          totalSteps: 4,
           currentInstallation: installation
         });
       }
@@ -234,9 +330,9 @@ export class VersionMigrationService {
 
       if (onProgress) {
         onProgress({
-          currentStep: `Moving files from build_${installation.buildId} to manifest_${installation.manifestId}`,
+          currentStep: `Moving files from legacy structure to build_${installation.manifestId}`,
           completedSteps: 2,
-          totalSteps: 3,
+          totalSteps: 4,
           currentInstallation: installation
         });
       }
@@ -255,38 +351,48 @@ export class VersionMigrationService {
         }
       }
 
-      // Remove the old directory
-      await fs.remove(installation.path);
+      if (onProgress) {
+        onProgress({
+          currentStep: `Updating configuration for ${installation.branchName}`,
+          completedSteps: 3,
+          totalSteps: 4,
+          currentInstallation: installation
+        });
+      }
 
-      // Update configuration to use manifest ID
+      // Update configuration to use the manifest ID as build ID
       const versionInfo: BranchVersionInfo = {
-        buildId: installation.buildId,
+        buildId: installation.manifestId, // Use manifest ID as build ID
         manifestId: installation.manifestId,
         downloadDate: new Date().toISOString(),
         isActive: false, // Will be set by caller
         path: newPath
       };
 
-      this.configService.setBranchManifestVersion(
+      // Set the branch version in the config
+      this.configService.setBranchVersion(
         installation.branchName, 
         installation.manifestId, 
         versionInfo
       );
 
+      // Set as active build for the branch
+      this.configService.setActiveBuild(installation.branchName, installation.manifestId);
+
       if (onProgress) {
         onProgress({
           currentStep: `Migration completed for ${installation.branchName}`,
-          completedSteps: 3,
-          totalSteps: 3,
+          completedSteps: 4,
+          totalSteps: 4,
           currentInstallation: installation
         });
       }
 
-      console.log(`Successfully migrated ${installation.branchName}/${installation.buildId} to manifest_${installation.manifestId}`);
+      console.log(`Successfully migrated ${installation.branchName} to build_${installation.manifestId}`);
       return { success: true };
 
     } catch (error) {
-      console.error(`Error migrating installation ${installation.branchName}/${installation.buildId}:`, error);
+      console.error(`Error migrating installation ${installation.branchName}:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error during migration'
@@ -365,10 +471,10 @@ export class VersionMigrationService {
         }
       }
 
-      // Set active manifests for migrated installations
+      // Set active builds for migrated installations
       for (const installation of result.migratedInstallations) {
         if (installation.manifestId) {
-          this.configService.setActiveManifest(installation.branchName, installation.manifestId);
+          this.configService.setActiveBuild(installation.branchName, installation.manifestId);
         }
       }
 
@@ -413,7 +519,13 @@ export class VersionMigrationService {
         const branchName = branchDir.name;
         const branchPath = path.join(branchesPath, branchName);
         
-        // Check for remaining build_* directories
+        // Check for remaining legacy flat structure
+        const needsMigration = await this.branchNeedsMigration(branchPath);
+        if (needsMigration) {
+          errors.push(`Legacy flat structure still exists: ${branchName}`);
+        }
+
+        // Check that build directories have proper content
         const versionDirs = await fs.readdir(branchPath, { withFileTypes: true });
         
         for (const versionDir of versionDirs) {
@@ -422,22 +534,11 @@ export class VersionMigrationService {
           const versionType = detectVersionIdentifierType(versionDir.name);
           
           if (versionType === 'build') {
-            errors.push(`Legacy build directory still exists: ${branchName}/${versionDir.name}`);
-          }
-        }
-
-        // Check that manifest directories have proper content
-        for (const versionDir of versionDirs) {
-          if (!versionDir.isDirectory()) continue;
-          
-          const versionType = detectVersionIdentifierType(versionDir.name);
-          
-          if (versionType === 'manifest') {
             const versionPath = path.join(branchPath, versionDir.name);
             const entries = await fs.readdir(versionPath);
             
             if (entries.length === 0) {
-              errors.push(`Empty manifest directory: ${branchName}/${versionDir.name}`);
+              errors.push(`Empty build directory: ${branchName}/${versionDir.name}`);
             }
           }
         }
@@ -494,7 +595,7 @@ export class VersionMigrationService {
           });
         }
 
-        // Find manifest directories and try to restore to build directories
+        // Find build directories and try to restore to flat structure
         const versionDirs = await fs.readdir(branchPath, { withFileTypes: true });
         
         for (const versionDir of versionDirs) {
@@ -502,27 +603,30 @@ export class VersionMigrationService {
           
           const versionType = detectVersionIdentifierType(versionDir.name);
           
-          if (versionType === 'manifest') {
-            const manifestId = versionDir.name.replace('manifest_', '');
+          if (versionType === 'build') {
+            const buildId = versionDir.name.replace('build_', '');
             const versionPath = path.join(branchPath, versionDir.name);
             
-            // Try to find corresponding build ID from configuration
-            const manifestVersions = this.configService.getBranchManifestVersions(branchName);
-            const versionInfo = manifestVersions[manifestId];
-            
-            if (versionInfo && versionInfo.buildId) {
-              const buildDirName = `build_${versionInfo.buildId}`;
-              const buildPath = path.join(branchPath, buildDirName);
+            try {
+              // Move all files from build directory back to branch root
+              const entries = await fs.readdir(versionPath, { withFileTypes: true });
               
-              try {
-                // Move files back to build directory
-                await fs.move(versionPath, buildPath);
-                console.log(`Restored ${branchName}/${versionDir.name} to ${buildDirName}`);
-              } catch (error) {
-                errors.push(`Failed to restore ${branchName}/${versionDir.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              for (const entry of entries) {
+                const oldPath = path.join(versionPath, entry.name);
+                const newPath = path.join(branchPath, entry.name);
+                
+                if (entry.isDirectory()) {
+                  await fs.move(oldPath, newPath);
+                } else {
+                  await fs.move(oldPath, newPath);
+                }
               }
-            } else {
-              errors.push(`No build ID found for manifest ${manifestId} in branch ${branchName}`);
+              
+              // Remove the empty build directory
+              await fs.remove(versionPath);
+              console.log(`Restored ${branchName}/${versionDir.name} to flat structure`);
+            } catch (error) {
+              errors.push(`Failed to restore ${branchName}/${versionDir.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
           }
         }

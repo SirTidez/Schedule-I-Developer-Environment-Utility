@@ -1,17 +1,58 @@
+/**
+ * Failure Dialog Component for Schedule I Developer Environment Utility
+ * 
+ * A specialized dialog component for displaying operation failures with
+ * detailed error information and multiple action options. Provides users
+ * with retry, skip, and cancel options along with access to log files.
+ * 
+ * Key features:
+ * - Modal overlay with error display
+ * - Detailed error information in scrollable area
+ * - Multiple action buttons (Retry, Skip, Cancel)
+ * - Optional log file access buttons
+ * - Responsive design with proper error formatting
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.2.0
+ */
+
 import React from 'react';
 
+/**
+ * Props interface for the FailureDialog component
+ * 
+ * @interface FailureDialogProps
+ */
 interface FailureDialogProps {
+  /** Whether the dialog is currently open/visible */
   isOpen: boolean;
+  /** Optional dialog title (defaults to 'Operation Failed') */
   title?: string;
+  /** The main error message to display */
   message: string;
+  /** Optional detailed error information for debugging */
   details?: string;
+  /** Callback function called when retry button is clicked */
   onRetry: () => void;
+  /** Callback function called when skip button is clicked */
   onSkip: () => void;
+  /** Callback function called when cancel button is clicked */
   onCancel: () => void;
+  /** Optional callback function for opening logs folder */
   onOpenLogs?: () => void;
+  /** Optional callback function for copying log path to clipboard */
   onCopyLogPath?: () => void;
 }
 
+/**
+ * Failure Dialog component
+ * 
+ * Renders a modal failure dialog with error details and action options.
+ * Only renders when isOpen is true, otherwise returns null.
+ * 
+ * @param props - Component props
+ * @returns JSX element containing the failure dialog or null
+ */
 const FailureDialog: React.FC<FailureDialogProps> = ({
   isOpen,
   title = 'Operation Failed',

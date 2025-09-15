@@ -1,15 +1,54 @@
+/**
+ * Confirm Dialog Component for Schedule I Developer Environment Utility
+ * 
+ * A reusable confirmation dialog component that displays a modal with
+ * customizable title, message, and action buttons. Used throughout the
+ * application for user confirmations before destructive actions.
+ * 
+ * Key features:
+ * - Modal overlay with backdrop
+ * - Customizable title and message
+ * - Customizable button text
+ * - Callback handlers for confirm/cancel actions
+ * - Responsive design with proper z-index layering
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.2.0
+ */
+
 import React from 'react';
 
+/**
+ * Props interface for the ConfirmDialog component
+ * 
+ * @interface ConfirmDialogProps
+ */
 interface ConfirmDialogProps {
+  /** Whether the dialog is currently open/visible */
   isOpen: boolean;
+  /** Optional dialog title (defaults to 'Please Confirm') */
   title?: string;
+  /** The confirmation message to display */
   message: string;
+  /** Optional confirm button text (defaults to 'Continue') */
   confirmText?: string;
+  /** Optional cancel button text (defaults to 'Cancel') */
   cancelText?: string;
+  /** Callback function called when confirm button is clicked */
   onConfirm: () => void;
+  /** Callback function called when cancel button is clicked */
   onCancel: () => void;
 }
 
+/**
+ * Confirm Dialog component
+ * 
+ * Renders a modal confirmation dialog with customizable content and actions.
+ * Only renders when isOpen is true, otherwise returns null.
+ * 
+ * @param props - Component props
+ * @returns JSX element containing the confirmation dialog or null
+ */
 const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen,
   title = 'Please Confirm',

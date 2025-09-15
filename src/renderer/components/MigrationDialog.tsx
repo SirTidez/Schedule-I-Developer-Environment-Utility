@@ -248,10 +248,10 @@ export const MigrationDialog: React.FC<MigrationDialogProps> = ({
               <div className="text-center">
                 <Info className="w-16 h-16 text-blue-400 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-white mb-2">
-                  Detect Legacy Installations
+                  Detect Branches Needing Migration
                 </h3>
                 <p className="text-gray-400 mb-6">
-                  This will scan your managed environment for installations using the old build ID based naming convention.
+                  This will scan your managed environment for branches that need migration from the old flat directory structure to the new build_&lt;manifest_id&gt; structure.
                 </p>
                 <button
                   onClick={detectLegacyInstallations}
@@ -266,7 +266,7 @@ export const MigrationDialog: React.FC<MigrationDialogProps> = ({
                   ) : (
                     <>
                       <RefreshCw className="w-4 h-4" />
-                      <span>Detect Legacy Installations</span>
+                      <span>Detect Branches Needing Migration</span>
                     </>
                   )}
                 </button>
@@ -280,25 +280,25 @@ export const MigrationDialog: React.FC<MigrationDialogProps> = ({
               <div className="text-center">
                 <AlertTriangle className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-white mb-2">
-                  Migrate to Manifest ID Versioning
+                  Migrate to Build Directory Structure
                 </h3>
                 <p className="text-gray-400 mb-6">
-                  Found {legacyInstallations.length} legacy installation(s) that need to be migrated.
+                  Found {legacyInstallations.length} legacy installation(s) that need to be migrated to the new build_&lt;manifest_id&gt; structure.
                 </p>
               </div>
 
               {/* Legacy Installations List */}
               <div className="bg-gray-800 rounded-lg p-4">
-                <h4 className="text-white font-medium mb-3">Legacy Installations Found:</h4>
+                <h4 className="text-white font-medium mb-3">Branches Needing Migration:</h4>
                 <div className="space-y-2">
                   {legacyInstallations.map((installation, index) => (
                     <div key={index} className="flex items-center justify-between bg-gray-700 rounded p-3">
                       <div>
                         <div className="text-white font-medium">
-                          {installation.branchName} - Build {installation.buildId}
+                          {installation.branchName} - Legacy Flat Structure
                         </div>
                         <div className="text-gray-400 text-sm">
-                          {installation.manifestId ? `Manifest ID: ${installation.manifestId}` : 'No manifest ID available'}
+                          {installation.manifestId ? `Will migrate to: build_${installation.manifestId}` : 'No manifest ID available'}
                         </div>
                       </div>
                       <div className="text-gray-400 text-sm">
@@ -341,7 +341,7 @@ export const MigrationDialog: React.FC<MigrationDialogProps> = ({
                   <span className="font-medium">Migration Note</span>
                 </div>
                 <div className="text-blue-300 mt-2 text-sm">
-                  Only installations with a resolved manifest ID will be migrated. Others can be retried after resolving Steam library detection.
+                  Only branches with a resolved manifest ID will be migrated. Others can be retried after resolving Steam library detection. The migration will move files from the flat structure to build_&lt;manifest_id&gt; directories.
                 </div>
               </div>
 
@@ -438,8 +438,8 @@ export const MigrationDialog: React.FC<MigrationDialogProps> = ({
                 </h3>
                 <p className="text-gray-400 mb-6">
                   {legacyInstallations.length === 0 
-                    ? 'No legacy installations found. Your environment is already using manifest ID based versioning.'
-                    : 'All legacy installations have been successfully migrated to manifest ID based versioning.'
+                    ? 'No branches need migration. Your environment is already using the new build directory structure.'
+                    : 'All branches have been successfully migrated to the new build_&lt;manifest_id&gt; structure.'
                   }
                 </p>
               </div>
@@ -450,11 +450,11 @@ export const MigrationDialog: React.FC<MigrationDialogProps> = ({
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div className="text-green-400">
                       <div className="font-medium">Successful:</div>
-                      <div>{migrationResult.migratedInstallations.length} installations</div>
+                      <div>{migrationResult.migratedInstallations.length} branches</div>
                     </div>
                     <div className="text-red-400">
                       <div className="font-medium">Failed:</div>
-                      <div>{migrationResult.failedInstallations.length} installations</div>
+                      <div>{migrationResult.failedInstallations.length} branches</div>
                     </div>
                   </div>
                 </div>

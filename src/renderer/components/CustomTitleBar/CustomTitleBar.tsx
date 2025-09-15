@@ -1,10 +1,45 @@
+/**
+ * Custom Title Bar Component for Schedule I Developer Environment Utility
+ * 
+ * Provides a custom title bar for the Electron application with window controls
+ * (minimize, maximize/restore, close) and application information display.
+ * Replaces the default OS title bar to provide a consistent cross-platform experience.
+ * 
+ * Key features:
+ * - Window control buttons (minimize, maximize/restore, close)
+ * - Application title and version display
+ * - Responsive maximize/restore button state
+ * - Update service integration for version display
+ * - Cross-platform window management
+ * 
+ * @author Schedule I Developer Environment Utility Team
+ * @version 2.2.0
+ */
+
 import React, { useState, useEffect } from 'react';
 import { useUpdateService } from '../../hooks/useUpdateService';
 
+/**
+ * Props interface for the CustomTitleBar component
+ * 
+ * @interface CustomTitleBarProps
+ */
 interface CustomTitleBarProps {
+  /** Optional custom title to display in the title bar */
   title?: string;
 }
 
+/**
+ * Custom Title Bar component
+ * 
+ * Renders a custom title bar with window controls and application information.
+ * Manages window state (maximized/restored) and provides user-friendly controls
+ * for window management operations.
+ * 
+ * @param props - Component props
+ * @param props.title - Optional custom title (defaults to "Schedule I Developer Environment")
+ * @returns JSX element containing the custom title bar
+ */
 export const CustomTitleBar: React.FC<CustomTitleBarProps> = ({ title = "Schedule I Developer Environment" }) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const { currentVersion, getCurrentVersion } = useUpdateService();
@@ -33,6 +68,14 @@ export const CustomTitleBar: React.FC<CustomTitleBarProps> = ({ title = "Schedul
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  /**
+   * Handles window minimize action
+   * 
+   * Minimizes the application window using the Electron API.
+   * Includes error handling for failed minimize operations.
+   * 
+   * @returns Promise<void>
+   */
   const handleMinimize = async () => {
     try {
       await window.electronAPI.window.minimize();
@@ -41,6 +84,14 @@ export const CustomTitleBar: React.FC<CustomTitleBarProps> = ({ title = "Schedul
     }
   };
 
+  /**
+   * Handles window maximize/restore toggle action
+   * 
+   * Toggles between maximized and restored window states using the Electron API.
+   * Updates the local state after a short delay to allow the window to update.
+   * 
+   * @returns Promise<void>
+   */
   const handleToggleMaximize = async () => {
     try {
       await window.electronAPI.window.toggleMaximize();
@@ -54,6 +105,14 @@ export const CustomTitleBar: React.FC<CustomTitleBarProps> = ({ title = "Schedul
     }
   };
 
+  /**
+   * Handles window close action
+   * 
+   * Closes the application window using the Electron API.
+   * Includes error handling for failed close operations.
+   * 
+   * @returns Promise<void>
+   */
   const handleClose = async () => {
     try {
       await window.electronAPI.window.close();
