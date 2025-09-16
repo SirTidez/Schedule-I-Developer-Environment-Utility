@@ -2,11 +2,11 @@
 
 All notable changes to the Schedule I Developer Environment Utility are documented in this file.
 
-## [2.2.0] - 2025-01-21
+## [2.2.0b] - 2025-01-21
 
-### 🏷️ Custom Description Management System
+### 🏷️ Custom Description Management System (Beta)
 
-This release introduces a comprehensive custom description management system that allows users to add meaningful names to their installed game versions, making version identification and management much more user-friendly.
+This beta release introduces a comprehensive custom description management system that allows users to add meaningful names to their installed game versions, making version identification and management much more user-friendly.
 
 #### Added
 - **Setup Wizard Enhancement**: 
