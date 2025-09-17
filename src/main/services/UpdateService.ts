@@ -19,6 +19,7 @@
  */
 
 import { app } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import * as fs from 'fs';
 import * as path from 'path';
 import { LoggingService } from './LoggingService';
@@ -70,10 +71,39 @@ export interface UpdateInfo {
 }
 
 /**
+ * Interface representing download progress information
+ */
+export interface DownloadProgress {
+  /** Download progress percentage (0-100) */
+  percent: number;
+  /** Bytes transferred */
+  transferred: number;
+  /** Total bytes to download */
+  total: number;
+  /** Download speed in bytes per second */
+  bytesPerSecond: number;
+}
+
+/**
+ * Interface representing update status
+ */
+export interface UpdateStatus {
+  /** Current status of the update process */
+  status: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+  /** Error message if status is 'error' */
+  error?: string;
+  /** Download progress if status is 'downloading' */
+  progress?: DownloadProgress;
+  /** Update information if available */
+  updateInfo?: UpdateInfo;
+}
+
+/**
  * Update Service class for managing application updates
  * 
  * Provides comprehensive update checking functionality with caching,
  * version comparison, and release information management.
+ * Now includes electron-updater integration for automatic updates.
  */
 export class UpdateService {
   /** GitHub repository identifier */
@@ -88,9 +118,136 @@ export class UpdateService {
   /** Update cache service instance */
   private readonly cacheService: UpdateCacheService;
 
+  /** Current update status */
+  private currentStatus: UpdateStatus = { status: 'not-available' };
+
+  /** Event listeners for update events */
+  private eventListeners: Map<string, Function[]> = new Map();
+
   constructor(loggingService: LoggingService, configDir: string) {
     this.loggingService = loggingService;
     this.cacheService = new UpdateCacheService(loggingService, configDir);
+    
+    // Configure autoUpdater
+    this.configureAutoUpdater();
+  }
+
+  /**
+   * Configure autoUpdater settings
+   */
+  private configureAutoUpdater(): void {
+    // Disable auto-download to give user control
+    autoUpdater.autoDownload = false;
+    
+    // Disable auto-install to give user control
+    autoUpdater.autoInstallOnAppQuit = false;
+
+    // Set up event listeners
+    autoUpdater.on('checking-for-update', () => {
+      this.loggingService.info('Checking for update...');
+      this.updateStatus({ status: 'checking' });
+    });
+
+    autoUpdater.on('update-available', (info) => {
+      this.loggingService.info(`Update available: ${info.version}`);
+      this.updateStatus({ 
+        status: 'available',
+        updateInfo: {
+          hasUpdate: true,
+          currentVersion: this.getCurrentVersion(),
+          latestVersion: info.version,
+          release: {
+            tag_name: info.version,
+            name: info.releaseName || info.version,
+            body: Array.isArray(info.releaseNotes) ? info.releaseNotes.join('\n') : (info.releaseNotes || ''),
+            published_at: new Date().toISOString(),
+            html_url: `https://github.com/${this.GITHUB_REPO}/releases/tag/${info.version}`,
+            assets: []
+          }
+        }
+      });
+    });
+
+    autoUpdater.on('update-not-available', (info) => {
+      this.loggingService.info(`Update not available. Current version: ${info.version}`);
+      this.updateStatus({ 
+        status: 'not-available',
+        updateInfo: {
+          hasUpdate: false,
+          currentVersion: this.getCurrentVersion(),
+          latestVersion: info.version
+        }
+      });
+    });
+
+    autoUpdater.on('error', (err) => {
+      this.loggingService.error('Auto-updater error:', err);
+      this.updateStatus({ 
+        status: 'error',
+        error: err.message
+      });
+    });
+
+    autoUpdater.on('download-progress', (progressObj) => {
+      const progress: DownloadProgress = {
+        percent: Math.round(progressObj.percent),
+        transferred: progressObj.transferred,
+        total: progressObj.total,
+        bytesPerSecond: progressObj.bytesPerSecond
+      };
+      
+      this.loggingService.info(`Download progress: ${progress.percent}%`);
+      this.updateStatus({ 
+        status: 'downloading',
+        progress
+      });
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+      this.loggingService.info(`Update downloaded: ${info.version}`);
+      this.updateStatus({ status: 'downloaded' });
+    });
+  }
+
+  /**
+   * Update the current status and notify listeners
+   */
+  private updateStatus(status: Partial<UpdateStatus>): void {
+    this.currentStatus = { ...this.currentStatus, ...status };
+    this.emit('status-changed', this.currentStatus);
+  }
+
+  /**
+   * Add event listener
+   */
+  on(event: string, listener: Function): void {
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, []);
+    }
+    this.eventListeners.get(event)!.push(listener);
+  }
+
+  /**
+   * Remove event listener
+   */
+  off(event: string, listener: Function): void {
+    const listeners = this.eventListeners.get(event);
+    if (listeners) {
+      const index = listeners.indexOf(listener);
+      if (index > -1) {
+        listeners.splice(index, 1);
+      }
+    }
+  }
+
+  /**
+   * Emit event to listeners
+   */
+  private emit(event: string, data: any): void {
+    const listeners = this.eventListeners.get(event);
+    if (listeners) {
+      listeners.forEach(listener => listener(data));
+    }
   }
 
   /**
@@ -241,6 +398,61 @@ export class UpdateService {
 
     this.loggingService.info(`Version comparison result: ${current} = ${latest}`);
     return 0;
+  }
+
+  /**
+   * Get current update status
+   */
+  getCurrentStatus(): UpdateStatus {
+    return this.currentStatus;
+  }
+
+  /**
+   * Check for updates using autoUpdater
+   */
+  async checkForUpdatesAutoUpdater(): Promise<void> {
+    try {
+      this.loggingService.info('Checking for updates using autoUpdater...');
+      await autoUpdater.checkForUpdates();
+    } catch (error) {
+      this.loggingService.error('Failed to check for updates:', error as Error);
+      this.updateStatus({ 
+        status: 'error',
+        error: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Download the available update
+   */
+  async downloadUpdate(): Promise<void> {
+    try {
+      this.loggingService.info('Starting update download...');
+      await autoUpdater.downloadUpdate();
+    } catch (error) {
+      this.loggingService.error('Failed to download update:', error as Error);
+      this.updateStatus({ 
+        status: 'error',
+        error: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Install the downloaded update and restart the application
+   */
+  async installUpdate(): Promise<void> {
+    try {
+      this.loggingService.info('Installing update and restarting...');
+      autoUpdater.quitAndInstall();
+    } catch (error) {
+      this.loggingService.error('Failed to install update:', error as Error);
+      this.updateStatus({ 
+        status: 'error',
+        error: (error as Error).message
+      });
+    }
   }
 
   /**

@@ -116,7 +116,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   update: {
     getCurrentVersion: () => ipcRenderer.invoke('update:get-current-version'),
     checkForUpdates: () => ipcRenderer.invoke('update:check-for-updates'),
-    getReleaseNotes: (release: any) => ipcRenderer.invoke('update:get-release-notes', release)
+    getReleaseNotes: (release: any) => ipcRenderer.invoke('update:get-release-notes', release),
+    // Auto-updater methods
+    checkForUpdatesAuto: () => ipcRenderer.invoke('update:check-for-updates-auto'),
+    downloadUpdate: () => ipcRenderer.invoke('update:download'),
+    installUpdate: () => ipcRenderer.invoke('update:install'),
+    getStatus: () => ipcRenderer.invoke('update:get-status'),
+    // Event listeners
+    onStatusChanged: (callback: (status: any) => void) => {
+      ipcRenderer.on('update:status-changed', (event, status) => callback(status));
+    },
+    removeStatusChangedListener: () => {
+      ipcRenderer.removeAllListeners('update:status-changed');
+    }
   },
   
   shell: {
@@ -371,6 +383,14 @@ declare global {
         getCurrentVersion: () => Promise<string>;
         checkForUpdates: () => Promise<{ hasUpdate: boolean; currentVersion: string; latestVersion: string; release?: any }>;
         getReleaseNotes: (release: any) => Promise<string>;
+        // Auto-updater methods
+        checkForUpdatesAuto: () => Promise<{ success: boolean; error?: string }>;
+        downloadUpdate: () => Promise<{ success: boolean; error?: string }>;
+        installUpdate: () => Promise<{ success: boolean; error?: string }>;
+        getStatus: () => Promise<{ status: string; error?: string; progress?: any; updateInfo?: any }>;
+        // Event listeners
+        onStatusChanged: (callback: (status: any) => void) => void;
+        removeStatusChangedListener: () => void;
       };
       shell: {
         openExternal: (url: string) => Promise<void>;

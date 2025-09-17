@@ -13,9 +13,12 @@
     "package": "electron-builder",
     "start": "electron .",
     "start:main": "electron dist/main/main/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "clean": "rimraf dist dist-v2.1.0 dist-v2.1.0-2 dist-v2.1.1 dist-v2.2.0 dist-v2.2.0b",
-    "prepackage": "npm run clean && npm run build"
+    "prepackage": "npm run clean && npm run build",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test --config=playwright.config.ts"
   },
   "keywords": [
     "electron",
@@ -36,6 +39,11 @@
       "dist/**/*",
       "node_modules/**/*"
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "SirTidez",
+      "repo": "Schedule-I-Developer-Environment-Utility"
+    },
     "win": {
       "target": [
         {
@@ -70,28 +78,37 @@
     }
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@tailwindcss/postcss": "^4.1.13",
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^24.5.1",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
     "@types/steam-user": "^5.1.0",
     "@vitejs/plugin-react": "^5.0.2",
+    "@vitest/coverage-v8": "^3.2.4",
     "autoprefixer": "^10.4.21",
     "concurrently": "^9.2.1",
     "electron": "^38.1.1",
     "electron-builder": "^26.0.20",
+    "electron-playwright-helpers": "^1.8.2",
+    "happy-dom": "^18.0.1",
     "postcss": "^8.5.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "rimraf": "^6.0.1",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
-    "vite": "^7.1.5"
+    "vite": "^7.1.5",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@types/react-router-dom": "^5.3.3",
     "electron-log": "^5.4.3",
     "electron-store": "^10.1.0",
+    "electron-updater": "^6.1.8",
     "extract-zip": "^2.0.1",
     "fs-extra": "^11.3.2",
     "lucide-react": "^0.544.0",

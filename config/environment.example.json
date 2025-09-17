@@ -1,0 +1,20 @@
+{
+  "development": {
+    "githubToken": "your_dev_token_here",
+    "repository": "SirTidez/Schedule-I-Developer-Environment-Utility",
+    "autoCheckUpdates": true,
+    "checkInterval": 3600000
+  },
+  "staging": {
+    "githubToken": "your_staging_token_here",
+    "repository": "SirTidez/Schedule-I-Developer-Environment-Utility",
+    "autoCheckUpdates": true,
+    "checkInterval": 1800000
+  },
+  "production": {
+    "githubToken": "your_production_token_here",
+    "repository": "SirTidez/Schedule-I-Developer-Environment-Utility",
+    "autoCheckUpdates": false,
+    "checkInterval": 7200000
+  }
+}
