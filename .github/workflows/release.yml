@@ -40,7 +40,6 @@ jobs:
       draft: true
         files: |
           dist-v2.2.0b/*.exe
-          dist-v2.2.0b/*.zip
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
