@@ -55,11 +55,6 @@
       ],
       "icon": "Assets/icon.png",
       "requestedExecutionLevel": "asInvoker"
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "SirTidez",
-      "repo": "Schedule-I-Developer-Environment-Utility"
     }
   },
   "devDependencies": {
@@ -93,7 +88,7 @@
     "@types/react-router-dom": "^5.3.3",
     "electron-log": "^5.4.3",
     "electron-store": "^10.1.0",
-    "electron-updater": "^6.1.8",
+    "electron-updater": "^6.6.2",
     "extract-zip": "^2.0.1",
     "fs-extra": "^11.3.2",
     "lucide-react": "^0.544.0",
@@ -102,6 +97,9 @@
     "vdf": "^0.0.2"
   },
   "overrides": {
-    "@electron/asar": "^4.0.1"
+    "@electron/asar": "^4.0.1",
+    "inflight": "^1.0.6",
+    "glob": "^10.0.0",
+    "@npmcli/move-file": "npm:@npmcli/fs@^3.0.0"
   }
 }
