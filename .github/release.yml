@@ -1,0 +1,54 @@
+changelog:
+  exclude:
+    labels:
+      - "ignore for release"
+      - "internal"
+  categories:
+    - title: "🚀 New Features"
+      labels:
+        - "enhancement"
+        - "feature"
+    - title: "🐛 Bug Fixes"
+      labels:
+        - "bug"
+        - "fix"
+    - title: "🔧 Maintenance"
+      labels:
+        - "chore"
+        - "dependencies"
+        - "maintenance"
+    - title: "📚 Documentation"
+      labels:
+        - "documentation"
+        - "docs"
+    - title: "🔒 Security"
+      labels:
+        - "security"
+    - title: "⚡ Performance"
+      labels:
+        - "performance"
+    - title: "🧪 Testing"
+      labels:
+        - "test"
+        - "testing"
+    - title: "🔨 Build & CI"
+      labels:
+        - "build"
+        - "ci"
+        - "workflow"
+    - title: "📦 Dependencies"
+      labels:
+        - "dependencies"
+        - "upgrade"
+    - title: "🎨 UI/UX"
+      labels:
+        - "ui"
+        - "ux"
+        - "design"
+    - title: "🔧 Configuration"
+      labels:
+        - "config"
+        - "configuration"
+    - title: "📝 Other Changes"
+      labels:
+        - "*"

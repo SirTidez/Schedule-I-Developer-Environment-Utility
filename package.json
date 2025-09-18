@@ -26,7 +26,7 @@
     "game-development",
     "steam"
   ],
-  "author": "Schedule I Modding Team",
+  "author": "SirTidez",
   "license": "MIT",
   "type": "commonjs",
   "build": {
@@ -51,30 +51,15 @@
           "arch": [
             "x64"
           ]
-        },
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
         }
       ],
       "icon": "Assets/icon.png",
       "requestedExecutionLevel": "asInvoker"
     },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "Assets/icon.png"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "Assets/icon.png"
+    "publish": {
+      "provider": "github",
+      "owner": "SirTidez",
+      "repo": "Schedule-I-Developer-Environment-Utility"
     }
   },
   "devDependencies": {
