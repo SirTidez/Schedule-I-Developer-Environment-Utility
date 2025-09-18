@@ -19,19 +19,19 @@ jobs:
 
       - name: Verify Tag Trigger
         run: |
-          echo "This workflow should only run on tag pushes"
-          echo "Current ref: ${{ github.ref }}"
-          echo "Current ref_name: ${{ github.ref_name }}"
-          echo "Current event_name: ${{ github.event_name }}"
-          if [[ "${{ github.event_name }}" != "push" ]]; then
-            echo "Error: This workflow should only run on push events"
+          Write-Host "This workflow should only run on tag pushes"
+          Write-Host "Current ref: ${{ github.ref }}"
+          Write-Host "Current ref_name: ${{ github.ref_name }}"
+          Write-Host "Current event_name: ${{ github.event_name }}"
+          if ("${{ github.event_name }}" -ne "push") {
+            Write-Host "Error: This workflow should only run on push events"
             exit 1
-          fi
-          if [[ ! "${{ github.ref }}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
-            echo "Error: This workflow should only run on version tags (v*.*.*)"
+          }
+          if ("${{ github.ref }}" -notmatch "^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+.*$") {
+            Write-Host "Error: This workflow should only run on version tags (v*.*.*)"
             exit 1
-          fi
-          echo "✅ Valid tag trigger confirmed"
+          }
+          Write-Host "✅ Valid tag trigger confirmed"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -68,13 +68,13 @@ jobs:
 
       - name: Verify Release Trigger
         run: |
-          echo "Creating release for tag: ${{ github.ref_name }}"
-          echo "Tag ref: ${{ github.ref }}"
-          if [[ ! "${{ github.ref }}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
-            echo "Error: This should only run on version tags"
+          Write-Host "Creating release for tag: ${{ github.ref_name }}"
+          Write-Host "Tag ref: ${{ github.ref }}"
+          if ("${{ github.ref }}" -notmatch "^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+.*$") {
+            Write-Host "Error: This should only run on version tags"
             exit 1
-          fi
-          echo "✅ Valid release trigger confirmed"
+          }
+          Write-Host "✅ Valid release trigger confirmed"
 
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
