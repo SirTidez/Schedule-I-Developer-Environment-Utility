@@ -1,0 +1,31 @@
+%% Update Check & Release Notes Sequence
+sequenceDiagram
+    participant UI as UpdateDialog
+    participant Hook as useUpdateService
+    participant Preload
+    participant Main
+    participant UpdateSvc as UpdateService
+    participant GitHub
+
+    UI->>Hook: checkForUpdates()
+    Hook->>Preload: electronAPI.update.checkForUpdates()
+    Preload->>Main: IPC update-check
+    Main->>UpdateSvc: Fetch latest release
+    UpdateSvc->>GitHub: Request releases
+    GitHub-->>UpdateSvc: Release JSON
+    UpdateSvc-->>Main: Normalized info
+    Main-->>Preload: IPC response
+    Preload-->>Hook: UpdateInfo
+    Hook-->>UI: setState(updateInfo)
+
+    alt Dialog has release details
+        UI->>Hook: getReleaseNotes(release)
+        Hook->>Preload: electronAPI.update.getReleaseNotes()
+        Preload->>Main: IPC update-getReleaseNotes
+        Main->>UpdateSvc: Retrieve markdown
+        UpdateSvc-->>Main: Release notes
+        Main-->>Preload: IPC response
+        Preload-->>Hook: Notes text
+        Hook-->>UI: setState(releaseNotes)
+        UI-->>User: Display notes
+    end

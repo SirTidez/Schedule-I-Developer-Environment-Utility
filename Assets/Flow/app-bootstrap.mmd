@@ -1,0 +1,19 @@
+%% App Bootstrap Sequence
+sequenceDiagram
+    participant User
+    participant Electron as Electron Main
+    participant Services as Service Container
+    participant Preload as Preload Bridge
+    participant Renderer as React Renderer
+
+    User->>Electron: Launch application
+    Electron->>Services: Instantiate core services
+    Electron->>Preload: Load preload script (typed IPC)
+    Electron->>Renderer: Create BrowserWindow
+    Renderer->>Preload: Request initial state
+    Preload->>Electron: IPC (config, update)
+    Electron->>Services: Fulfil request
+    Services-->>Electron: Return data
+    Electron-->>Preload: IPC response
+    Preload-->>Renderer: Resolve promises
+    Renderer-->>User: Render initial UI

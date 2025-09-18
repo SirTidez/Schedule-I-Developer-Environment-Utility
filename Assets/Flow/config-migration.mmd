@@ -1,0 +1,22 @@
+%% Config Migration Flow
+sequenceDiagram
+    participant Electron as Main Process
+    participant Config as ConfigService
+    participant Migration as VersionMigrationService
+    participant FS as Filesystem
+    participant Renderer as Renderer UI
+
+    Electron->>Config: Load config on startup
+    Config->>FS: Read file from AppData
+    FS-->>Config: Legacy config
+    Config->>Migration: ensureCurrentVersion(config)
+    alt Migration needed
+        Migration->>Migration: Apply step(s)
+        Migration-->>Config: Migrated config
+        Config->>FS: Persist upgraded config
+        Config-->>Electron: Updated config
+        Electron->>Renderer: Notify migration success
+    else Already current
+        Migration-->>Config: No changes
+        Config-->>Electron: Existing config
+    end

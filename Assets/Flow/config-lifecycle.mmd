@@ -1,0 +1,27 @@
+%% Config Load & Update Sequence
+sequenceDiagram
+    participant Component as React Component
+    participant Hook as useConfigService
+    participant Preload
+    participant Main as Main IPC
+    participant Config as ConfigService
+
+    Component->>Hook: Mount hook
+    Hook->>Preload: electronAPI.config.get()
+    Preload->>Main: IPC config-get
+    Main->>Config: Read persisted config
+    Config-->>Main: Config data
+    Main-->>Preload: Response
+    Preload-->>Hook: Resolve config
+    Hook-->>Component: setState(config)
+    Component-->>User: Render config details
+
+    Note over Component,Hook: Mutating configuration
+    Component->>Hook: updateConfig(partial)
+    Hook->>Preload: electronAPI.config.update()
+    Preload->>Main: IPC config-update
+    Main->>Config: Merge & persist
+    Config-->>Main: Updated config
+    Main-->>Preload: Response
+    Preload-->>Hook: Updated config
+    Hook-->>Component: setState(newConfig)

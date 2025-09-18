@@ -1,0 +1,31 @@
+%% DepotDownloader Flow
+sequenceDiagram
+    participant User
+    participant UI as Managed Environment UI
+    participant Preload
+    participant Main
+    participant SteamSvc as SteamService
+    participant DepotSvc as SteamUpdateService
+    participant DepotDL as DepotDownloader
+    participant FS as Filesystem
+
+    User->>UI: Trigger branch install/update
+    UI->>Preload: electronAPI.depotdownloader.start()
+    Preload->>Main: IPC depotdownloader-start
+    Main->>SteamSvc: Validate libraries & credentials
+    SteamSvc-->>Main: Session context
+    Main->>DepotSvc: Start download task
+    DepotSvc->>DepotDL: Spawn CLI with args
+    loop Progress events
+        DepotDL-->>DepotSvc: stdout progress
+        DepotSvc->>Main: onProgress payload
+        Main->>Preload: IPC progress
+        Preload->>UI: Update progress state
+        UI-->>User: Render progress UI
+    end
+    DepotDL-->>DepotSvc: Exit success
+    DepotSvc->>FS: Place files in managed env
+    DepotSvc-->>Main: Completion data
+    Main-->>Preload: IPC completion
+    Preload-->>UI: Resolve promise
+    UI-->>User: Show success

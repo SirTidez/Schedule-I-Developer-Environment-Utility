@@ -1,0 +1,24 @@
+%% Window & Dialog Management Flow
+sequenceDiagram
+    participant Renderer as React Component
+    participant Preload
+    participant Main
+    participant WindowSvc as WindowService
+    participant DialogSvc as DialogService
+    participant OSDialog as Native Dialog
+
+    Renderer->>Preload: electronAPI.window.open('update-dialog')
+    Preload->>Main: IPC window-open
+    Main->>WindowSvc: Show modal window
+    WindowSvc-->>Main: Success
+    Main-->>Preload: Ack
+    Preload-->>Renderer: Promise resolved
+
+    Renderer->>Preload: electronAPI.dialog.showOpenDialog(opts)
+    Preload->>Main: IPC dialog-open
+    Main->>DialogSvc: Invoke dialog handler
+    DialogSvc->>OSDialog: Display file picker
+    OSDialog-->>DialogSvc: Selected paths
+    DialogSvc-->>Main: Result
+    Main-->>Preload: IPC response
+    Preload-->>Renderer: Deliver selection
