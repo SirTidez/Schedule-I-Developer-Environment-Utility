@@ -17,22 +17,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Verify Tag Trigger
-        run: |
-          Write-Host "This workflow should only run on tag pushes"
-          Write-Host "Current ref: ${{ github.ref }}"
-          Write-Host "Current ref_name: ${{ github.ref_name }}"
-          Write-Host "Current event_name: ${{ github.event_name }}"
-          if ("${{ github.event_name }}" -ne "push") {
-            Write-Host "Error: This workflow should only run on push events"
-            exit 1
-          }
-          if ("${{ github.ref }}" -notmatch "^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+.*$") {
-            Write-Host "Error: This workflow should only run on version tags (v*.*.*)"
-            exit 1
-          }
-          Write-Host "✅ Valid tag trigger confirmed"
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -65,16 +49,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Verify Release Trigger
-        run: |
-          Write-Host "Creating release for tag: ${{ github.ref_name }}"
-          Write-Host "Tag ref: ${{ github.ref }}"
-          if ("${{ github.ref }}" -notmatch "^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+.*$") {
-            Write-Host "Error: This should only run on version tags"
-            exit 1
-          }
-          Write-Host "✅ Valid release trigger confirmed"
 
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
