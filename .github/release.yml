@@ -15,7 +15,6 @@ changelog:
     - title: "🔧 Maintenance"
       labels:
         - "chore"
-        - "dependencies"
         - "maintenance"
     - title: "📚 Documentation"
       labels:
