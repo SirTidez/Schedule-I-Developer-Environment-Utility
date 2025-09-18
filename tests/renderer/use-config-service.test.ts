@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { setElectronNamespace } from '../setup/globals';
 import { useConfigService } from '../../src/renderer/hooks/useConfigService';
 
+// Representative config snapshot used to validate happy-path reads.
 const sampleConfig = {
   steamLibraryPath: 'C:/Steam',
   gameInstallPath: 'C:/Games/ScheduleI',
@@ -47,6 +48,7 @@ describe('useConfigService', () => {
     cleanup = undefined;
   });
 
+  // Hook should eagerly load persisted config and expose it to consumers.
   test('loads configuration on mount', async () => {
     const { result } = renderHook(() => useConfigService());
 

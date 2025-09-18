@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
+import './electronMocks';
 
 type ElectronNamespace = Record<string, unknown>;
 
