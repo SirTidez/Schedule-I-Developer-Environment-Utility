@@ -317,7 +317,19 @@ async function handleValidateInstallation(event: any, depotDownloaderPath?: stri
  * @param options Additional options like useQR, twoFactorCode
  * @returns Promise<{success: boolean, error?: string, requiresSteamGuard?: boolean}> Login result
  */
-async function handleLogin(event: any, depotDownloaderPath: string | undefined, username: string, password: string, options: any = {}): Promise<{success: boolean, error?: string, requiresSteamGuard?: boolean}> {
+async function handleLogin(
+  event: any,
+  depotDownloaderPath: string | undefined,
+  username: string,
+  password: string,
+  options: any = {}
+): Promise<{
+  success: boolean;
+  error?: string;
+  requiresSteamGuard?: boolean;
+  guardType?: 'email' | 'mobile';
+  message?: string;
+}> {
   try {
 
     // Check if Steam is running
@@ -399,13 +411,25 @@ async function handleLogin(event: any, depotDownloaderPath: string | undefined, 
               // No code provided; resolve early and kill process
               earlyResolved = true;
               try { depotDownloader.kill(); } catch {}
-              return resolve({ success: false, error: 'Steam Guard email code required', requiresSteamGuard: true });
+              return resolve({
+                success: false,
+                error: 'Steam Guard email code required. Check your email and enter the code.',
+                requiresSteamGuard: true,
+                guardType: 'email',
+                message: 'Steam Guard email code required. Check your email and enter the code.'
+              });
             }
 
             if (steamGuardType === 'mobile' && !options?.confirmSteamGuard && !earlyResolved) {
               earlyResolved = true;
               try { depotDownloader.kill(); } catch {}
-              return resolve({ success: false, error: 'Steam Guard mobile approval required', requiresSteamGuard: true });
+              return resolve({
+                success: false,
+                error: 'Steam Guard mobile approval required. Approve the login in your Steam Mobile app.',
+                requiresSteamGuard: true,
+                guardType: 'mobile',
+                message: 'Steam Guard mobile approval required. Approve the login in your Steam Mobile app.'
+              });
             }
           }
         }
@@ -447,10 +471,15 @@ async function handleLogin(event: any, depotDownloaderPath: string | undefined, 
 
         if (!loginCompleted) {
           if (steamGuardRequired) {
+            const guardMessage = steamGuardType === 'email'
+              ? 'Steam Guard email code required. Check your email and enter the code.'
+              : 'Steam Guard mobile approval required. Approve the login in your Steam Mobile app.';
             resolve({
               success: false,
-              error: 'Steam Guard authentication required. Please try again with 2FA.',
-              requiresSteamGuard: true
+              error: guardMessage,
+              requiresSteamGuard: true,
+              guardType: steamGuardType,
+              message: guardMessage
             });
           } else if (code === 0) {
             // Success based on exit code

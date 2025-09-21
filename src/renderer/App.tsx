@@ -17,7 +17,7 @@
  * @version 2.0.3
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import SetupWizard from './components/SetupWizard/SetupWizard';
 import ManagedEnvironment from './components/ManagedEnvironment/ManagedEnvironment';
@@ -27,6 +27,7 @@ import DefaultModsProgress from './components/DefaultModsProgress/DefaultModsPro
 import SteamCMDSetup from './components/SteamCMDSetup';
 import { MigrationDialog } from './components/MigrationDialog';
 import { CustomTitleBar } from './components/CustomTitleBar/CustomTitleBar';
+import SteamLoginGate from './components/SteamLoginGate/SteamLoginGate';
 import { useConfigValidation } from './hooks/useConfigValidation';
 
 /**
@@ -43,10 +44,49 @@ const AppContent: React.FC = () => {
   const [shouldShowManagedEnvironment, setShouldShowManagedEnvironment] = useState(false);
   const [showDepotDownloaderSetup, setShowDepotDownloaderSetup] = useState(false);
   const [showMigrationDialog, setShowMigrationDialog] = useState(false);
+  const [showSteamLoginGate, setShowSteamLoginGate] = useState(false);
   const [depotDownloaderConfig, setDepotDownloaderConfig] = useState<{useDepotDownloader: boolean, depotDownloaderPath: string | null} | null>(null);
   const [managedEnvironmentPath, setManagedEnvironmentPath] = useState<string>('');
   const { validation, configExists, validateConfig, checkConfigExists } = useConfigValidation();
   const location = useLocation();
+
+  const prepareManagedEnvironmentView = useCallback(async () => {
+    try {
+      const config = await window.electronAPI?.config?.get();
+      if (config) {
+        setDepotDownloaderConfig({
+          useDepotDownloader: !!config.useDepotDownloader,
+          depotDownloaderPath: config.depotDownloaderPath || null
+        });
+      }
+
+      if (config?.useDepotDownloader) {
+        try {
+          const credRes = await window.electronAPI?.credCache?.get?.();
+          const hasCreds = !!(credRes?.success && credRes.credentials?.username && credRes.credentials?.password);
+          if (!hasCreds) {
+            setShowSteamLoginGate(true);
+            setShouldShowManagedEnvironment(false);
+            return false;
+          }
+        } catch (credError) {
+          console.error('Failed to verify cached Steam credentials:', credError);
+          setShowSteamLoginGate(true);
+          setShouldShowManagedEnvironment(false);
+          return false;
+        }
+      }
+
+      setShowSteamLoginGate(false);
+      setShouldShowManagedEnvironment(true);
+      return true;
+    } catch (error) {
+      console.error('Error preparing managed environment view:', error);
+      setShowSteamLoginGate(true);
+      setShouldShowManagedEnvironment(false);
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     const checkDepotDownloaderConfiguration = async () => {
@@ -98,7 +138,7 @@ const AppContent: React.FC = () => {
         const config = await window.electronAPI?.config?.get();
         if (config?.managedEnvironmentPath) {
           setManagedEnvironmentPath(config.managedEnvironmentPath);
-          
+
           // Check for legacy installations
           const result = await window.electronAPI?.migration?.detectLegacyInstallations(config.managedEnvironmentPath);
           if (result?.success && result.installations.length > 0) {
@@ -106,21 +146,21 @@ const AppContent: React.FC = () => {
             setShowMigrationDialog(true);
           } else {
             // No legacy installations - show managed environment
-            setShouldShowManagedEnvironment(true);
+            await prepareManagedEnvironmentView();
           }
         } else {
           // No managed environment path - show managed environment anyway
-          setShouldShowManagedEnvironment(true);
+          await prepareManagedEnvironmentView();
         }
       } catch (error) {
         console.error('Error checking migration needs:', error);
         // On error, show managed environment
-        setShouldShowManagedEnvironment(true);
+        await prepareManagedEnvironmentView();
       }
     };
 
     checkDepotDownloaderConfiguration();
-  }, []);
+  }, [prepareManagedEnvironmentView]);
 
   // Check if user is forcing setup wizard
   const forceSetupWizard = location.search.includes('setup=true');
@@ -158,16 +198,21 @@ const AppContent: React.FC = () => {
   };
 
   // Handle migration dialog close
-  const handleMigrationClose = () => {
+  const handleMigrationClose = async () => {
     setShowMigrationDialog(false);
-    setShouldShowManagedEnvironment(true);
+    await prepareManagedEnvironmentView();
   };
 
   // Handle migration completion
-  const handleMigrationComplete = (result: any) => {
+  const handleMigrationComplete = async (result: any) => {
     setShowMigrationDialog(false);
-    setShouldShowManagedEnvironment(true);
+    await prepareManagedEnvironmentView();
   };
+
+  const handleSteamLoginSuccess = useCallback(async () => {
+    setShowSteamLoginGate(false);
+    await prepareManagedEnvironmentView();
+  }, [prepareManagedEnvironmentView]);
 
   // Show loading state while checking configuration
   if (isLoading) {
@@ -207,6 +252,20 @@ const AppContent: React.FC = () => {
             onClose={handleMigrationClose}
             managedEnvironmentPath={managedEnvironmentPath}
             onMigrationComplete={handleMigrationComplete}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (showSteamLoginGate && !forceSetupWizard) {
+    return (
+      <div className="h-screen bg-gray-900 text-white flex flex-col overflow-hidden">
+        <CustomTitleBar title="Schedule I Developer Environment - Steam Login" />
+        <div className="flex-1 overflow-auto">
+          <SteamLoginGate
+            depotDownloaderPath={depotDownloaderConfig?.depotDownloaderPath || null}
+            onSuccess={handleSteamLoginSuccess}
           />
         </div>
       </div>
