@@ -27,7 +27,19 @@ interface BranchInfo {
   installedVersions: number;
   // Steam version info
   steamManifestId?: string; // Latest manifest ID from Steam API
+  updateManifestId?: string; // Manifest ID queued for update when using DepotDownloader
 }
+
+type UserAddedVersionInfo = {
+  buildId: string;
+  manifestId: string;
+  downloadDate: string;
+  description?: string;
+  isInstalled?: boolean;
+  isActive?: boolean;
+  isUserAdded?: boolean;
+  sizeBytes?: number;
+};
 
 const ManagedEnvironment: React.FC = () => {
   const navigate = useNavigate();
@@ -142,6 +154,59 @@ const ManagedEnvironment: React.FC = () => {
 
       const branchInfos: BranchInfo[] = [];
 
+      const userAddedVersionsCache: Record<string, UserAddedVersionInfo[]> = {};
+      const branchesNeedingUserAddedUpdate = new Set<string>();
+
+      const getUserAddedVersionsForBranch = async (branchKey: string): Promise<UserAddedVersionInfo[]> => {
+        if (!userAddedVersionsCache[branchKey]) {
+          try {
+            const versions = await window.electronAPI.config.getUserAddedVersions(branchKey);
+            userAddedVersionsCache[branchKey] = Array.isArray(versions) ? [...versions] : [];
+          } catch (err) {
+            console.warn(`Failed to load user-added versions for ${branchKey}:`, err);
+            userAddedVersionsCache[branchKey] = [];
+          }
+        }
+        return userAddedVersionsCache[branchKey];
+      };
+
+      // Prefetch latest DepotDownloader manifest information when available
+      let latestDepotManifests: Record<string, { manifestId: string; buildId: string }> = {};
+      if (config.useDepotDownloader) {
+        try {
+          const credRes = await window.electronAPI?.credCache?.get?.();
+          const creds = credRes?.success ? credRes.credentials : null;
+          const branchesToCheck = allBranches
+            .filter(branch => {
+              const manifestActive = config.activeManifestPerBranch?.[branch.folderName];
+              const buildActive = config.activeBuildPerBranch?.[branch.folderName];
+              const trackedBuild = config.branchBuildIds?.[branch.folderName];
+              return !!manifestActive || !!buildActive || !!trackedBuild;
+            })
+            .map(branch => branch.folderName);
+
+          if (creds?.username && creds?.password && config.managedEnvironmentPath && branchesToCheck.length > 0) {
+            const appId = await window.electronAPI.steam.getScheduleIAppId();
+            if (appId) {
+              const ddPath = config.depotDownloaderPath || undefined;
+              const manifestResult = await window.electronAPI.depotdownloader.downloadManifests(
+                ddPath,
+                creds.username,
+                creds.password,
+                branchesToCheck,
+                appId,
+                config.managedEnvironmentPath
+              );
+              if (manifestResult?.success && manifestResult.manifests) {
+                latestDepotManifests = manifestResult.manifests;
+              }
+            }
+          }
+        } catch (manifestError) {
+          console.warn('Failed to fetch latest DepotDownloader manifests for update detection:', manifestError);
+        }
+      }
+
       // Fetch latest branch build IDs via Steam (node-steam-user)
       // Note: This now uses cached data to reduce resource usage - Steam API calls
       // are cached for 5 minutes to avoid repeated expensive API requests
@@ -197,33 +262,21 @@ const ManagedEnvironment: React.FC = () => {
         let remoteBuildIdNum: number | undefined = undefined;
         const remoteBuildStr = latestBranchBuilds[branch.steamBranchKey] || '';
         if (remoteBuildStr) {
-          remoteBuildIdNum = parseInt(remoteBuildStr);
-          
-          // For manifest-based installations (DepotDownloader), we don't compare build IDs for updates
-          // For build-based installations (copy), we compare build IDs
-          if (activeManifestId) {
-            // DepotDownloader installation - skip build ID comparison for now
-            // TODO: Implement manifest-based update detection if needed
-            needsUpdate = false;
-          } else if (buildId && typeof buildId === 'string' && buildId.includes('/')) {
-            // DepotDownloader timestamp format (MM/DD/YYYY HH:MM:SS) - skip comparison
-            needsUpdate = false;
-          } else if (buildId && typeof buildId === 'number' && buildId > 0) {
-            // Copy installation - use numeric build ID comparison
-            needsUpdate = remoteBuildIdNum > buildId;
-          } else if (buildId && typeof buildId === 'string' && !isNaN(Number(buildId))) {
-            // String buildId that can be parsed as number
-            const numericBuildId = Number(buildId);
-            needsUpdate = remoteBuildIdNum > numericBuildId;
+          const parsed = parseInt(remoteBuildStr, 10);
+          if (!Number.isNaN(parsed)) {
+            remoteBuildIdNum = parsed;
           }
         }
+        let updateManifestId: string | undefined;
 
         // Load version information for multi-version support
         let availableVersions: Array<{buildId: string, date: string, sizeBytes?: number}> = [];
         let activeVersion = '';
         let installedVersions = 0;
-        let steamManifestId = '';
+        let steamManifestId = latestDepotManifests[branch.folderName]?.manifestId || '';
+        const depotManifestBuildId = latestDepotManifests[branch.folderName]?.buildId;
 
+        let installed: any[] = [];
         try {
           // Get available versions from Steam
           const available = await window.electronAPI.steam.listBranchBuilds(branch.steamBranchKey, 10);
@@ -234,7 +287,7 @@ const ManagedEnvironment: React.FC = () => {
           }));
 
           // Get installed versions (both build and manifest based)
-          const installed = await window.electronAPI.steam.getInstalledVersions(branch.folderName);
+          installed = await window.electronAPI.steam.getInstalledVersions(branch.folderName);
           installedVersions = installed.length;
 
           // Find active version from config (prioritize manifest over build)
@@ -250,43 +303,100 @@ const ManagedEnvironment: React.FC = () => {
           }
 
           // Get latest manifest ID from Steam API for this branch
-          try {
-            const depotManifests = await window.electronAPI.steamBranch.getDepotManifestsForBranch(branch.steamBranchKey);
-            if (depotManifests?.success && depotManifests.depots && depotManifests.depots.length > 0) {
-              // Find the primary depot manifest (assuming depot 3164501 is the main one)
-              const primaryDepot = depotManifests.depots.find((d: any) => d.depotId === '3164501');
-              if (primaryDepot) {
-                steamManifestId = primaryDepot.manifestId;
-              } else if (depotManifests.depots.length > 0) {
-                // Fallback to first depot if primary not found
-                steamManifestId = depotManifests.depots[0].manifestId;
+          if (!steamManifestId) {
+            try {
+              const depotManifests = await window.electronAPI.steamBranch.getDepotManifestsForBranch(branch.steamBranchKey);
+              if (depotManifests?.success && depotManifests.depots && depotManifests.depots.length > 0) {
+                // Find the primary depot manifest (assuming depot 3164501 is the main one)
+                const primaryDepot = depotManifests.depots.find((d: any) => d.depotId === '3164501');
+                if (primaryDepot) {
+                  steamManifestId = primaryDepot.manifestId;
+                } else if (depotManifests.depots.length > 0) {
+                  // Fallback to first depot if primary not found
+                  steamManifestId = depotManifests.depots[0].manifestId;
+                }
+              } else {
+                // If no depot manifests available, try to get build ID as fallback
+                console.warn(`No depot manifests found for ${branch.name} (${branch.steamBranchKey}), trying build ID fallback`);
+                try {
+                  const buildIdResult = await window.electronAPI.steamBranch.getBranchBuildId(branch.steamBranchKey);
+                  if (buildIdResult?.success && buildIdResult.buildId) {
+                    steamManifestId = `Build ${buildIdResult.buildId}`;
+                  }
+                } catch (buildIdErr) {
+                  console.warn(`Failed to get build ID for ${branch.name}:`, buildIdErr);
+                }
               }
-            } else {
-              // If no depot manifests available, try to get build ID as fallback
-              console.warn(`No depot manifests found for ${branch.name} (${branch.steamBranchKey}), trying build ID fallback`);
+            } catch (manifestErr) {
+              console.warn(`Failed to get manifest ID for ${branch.name}:`, manifestErr);
+              // Try build ID as fallback
               try {
                 const buildIdResult = await window.electronAPI.steamBranch.getBranchBuildId(branch.steamBranchKey);
                 if (buildIdResult?.success && buildIdResult.buildId) {
                   steamManifestId = `Build ${buildIdResult.buildId}`;
                 }
               } catch (buildIdErr) {
-                console.warn(`Failed to get build ID for ${branch.name}:`, buildIdErr);
+                console.warn(`Failed to get build ID fallback for ${branch.name}:`, buildIdErr);
               }
-            }
-          } catch (manifestErr) {
-            console.warn(`Failed to get manifest ID for ${branch.name}:`, manifestErr);
-            // Try build ID as fallback
-            try {
-              const buildIdResult = await window.electronAPI.steamBranch.getBranchBuildId(branch.steamBranchKey);
-              if (buildIdResult?.success && buildIdResult.buildId) {
-                steamManifestId = `Build ${buildIdResult.buildId}`;
-              }
-            } catch (buildIdErr) {
-              console.warn(`Failed to get build ID fallback for ${branch.name}:`, buildIdErr);
             }
           }
         } catch (err) {
           console.warn(`Failed to load version info for ${branch.name}:`, err);
+        }
+
+        // Determine update requirement
+        const remoteManifestId = (steamManifestId && /^\d+$/.test(steamManifestId)) ? steamManifestId : '';
+        if (activeManifestId) {
+          if (remoteManifestId) {
+            needsUpdate = remoteManifestId !== activeManifestId;
+            if (needsUpdate) {
+              updateManifestId = remoteManifestId;
+            }
+          } else if (depotManifestBuildId && remoteBuildIdNum && !Number.isNaN(Number(depotManifestBuildId))) {
+            // Fallback to comparing build IDs if manifest is unavailable
+            needsUpdate = remoteBuildIdNum > Number(depotManifestBuildId);
+          } else {
+            needsUpdate = false;
+          }
+        } else if (remoteBuildIdNum !== undefined) {
+          if (buildId && typeof buildId === 'string' && buildId.includes('/')) {
+            // DepotDownloader timestamp format - cannot compare numerically
+            needsUpdate = false;
+          } else if (buildId && typeof buildId === 'number' && buildId > 0) {
+            needsUpdate = remoteBuildIdNum > buildId;
+          } else if (buildId && typeof buildId === 'string' && !Number.isNaN(Number(buildId))) {
+            needsUpdate = remoteBuildIdNum > Number(buildId);
+          }
+        }
+
+        if (needsUpdate && updateManifestId && config.useDepotDownloader) {
+          // Ensure the latest manifest is enqueued in Version Manager
+          try {
+            const installedManifests = new Set(
+              installed
+                .map((v: any) => v.manifestId || v.buildId)
+                .filter(Boolean)
+            );
+            if (!installedManifests.has(updateManifestId)) {
+              const userAdded = await getUserAddedVersionsForBranch(branch.steamBranchKey);
+              const alreadyQueued = userAdded.some(v => v.manifestId === updateManifestId);
+              if (!alreadyQueued) {
+                const versionEntry: UserAddedVersionInfo = {
+                  buildId: updateManifestId,
+                  manifestId: updateManifestId,
+                  downloadDate: new Date().toISOString(),
+                  description: `Latest manifest ${updateManifestId}`,
+                  isInstalled: false,
+                  isActive: false,
+                  isUserAdded: true
+                };
+                userAddedVersionsCache[branch.steamBranchKey] = [...userAdded, versionEntry];
+                branchesNeedingUserAddedUpdate.add(branch.steamBranchKey);
+              }
+            }
+          } catch (enqueueErr) {
+            console.warn(`Failed to queue manifest ${updateManifestId} for branch ${branch.name}:`, enqueueErr);
+          }
         }
 
         branchInfos.push({
@@ -304,8 +414,19 @@ const ManagedEnvironment: React.FC = () => {
           availableVersions,
           activeVersion,
           installedVersions,
-          steamManifestId
+          steamManifestId,
+          updateManifestId
         });
+      }
+
+      if (branchesNeedingUserAddedUpdate.size > 0) {
+        for (const branchKey of branchesNeedingUserAddedUpdate) {
+          try {
+            await window.electronAPI.config.setUserAddedVersions(branchKey, userAddedVersionsCache[branchKey]);
+          } catch (err) {
+            console.warn(`Failed to persist user-added versions for ${branchKey}:`, err);
+          }
+        }
       }
 
       setBranches(branchInfos);
@@ -904,11 +1025,13 @@ const ManagedEnvironment: React.FC = () => {
                       {/* Version Manager Button */}
                       <button
                         onClick={() => handleOpenVersionManager(branch)}
-                        className="p-1 text-gray-400 hover:text-white transition-colors"
-                        title="Manage versions"
+                        className={`p-1 rounded transition-colors ${branch.needsUpdate ? 'bg-blue-900/30 text-blue-300 hover:text-blue-100' : 'text-gray-400 hover:text-white'}`}
+                        title={branch.needsUpdate ? 'Install latest update' : 'Manage versions'}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v8" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4 4 4-4" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19h14" />
                         </svg>
                       </button>
                     </div>
