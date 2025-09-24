@@ -375,6 +375,18 @@ async function handleLogin(
       let loginCompleted = false;
       let codeSent = false;
       let earlyResolved = false as boolean;
+      const loginTimeoutMs = options?.confirmSteamGuard ? 120000 : 30000;
+      const loginTimeout = setTimeout(() => {
+        try { depotDownloader.kill(); } catch {}
+        resolve({
+          success: false,
+          error: 'Steam login test timed out'
+        });
+      }, loginTimeoutMs);
+
+      const cleanupTimeout = () => {
+        clearTimeout(loginTimeout);
+      };
 
       // Monitor output for Steam Guard and completion (DepotDownloader has clearer messages)
       const checkOutput = (data: string) => {
@@ -411,6 +423,7 @@ async function handleLogin(
               // No code provided; resolve early and kill process
               earlyResolved = true;
               try { depotDownloader.kill(); } catch {}
+              cleanupTimeout();
               return resolve({
                 success: false,
                 error: 'Steam Guard email code required. Check your email and enter the code.',
@@ -423,6 +436,7 @@ async function handleLogin(
             if (steamGuardType === 'mobile' && !options?.confirmSteamGuard && !earlyResolved) {
               earlyResolved = true;
               try { depotDownloader.kill(); } catch {}
+              cleanupTimeout();
               return resolve({
                 success: false,
                 error: 'Steam Guard mobile approval required. Approve the login in your Steam Mobile app.',
@@ -439,6 +453,7 @@ async function handleLogin(
             fullOutput.includes('Logged in as')) {
           if (!loginCompleted) {
             loginCompleted = true;
+            cleanupTimeout();
             resolve({ success: true });
           }
         }
@@ -446,6 +461,7 @@ async function handleLogin(
         // Check for login failure (DepotDownloader provides better error messages)
         if (fullOutput.includes('Login failed') || fullOutput.includes('Invalid password') ||
             fullOutput.includes('Invalid username') || fullOutput.includes('Access denied')) {
+          cleanupTimeout();
           resolve({
             success: false,
             error: 'Login failed: Invalid credentials or account access denied'
@@ -468,6 +484,7 @@ async function handleLogin(
       depotDownloader.on('close', (code) => {
         const fullOutput = output + errorOutput;
         currentLoginProc = null;
+        cleanupTimeout();
 
         if (!loginCompleted) {
           if (steamGuardRequired) {
@@ -495,20 +512,12 @@ async function handleLogin(
 
       depotDownloader.on('error', (error) => {
         console.error('DepotDownloader login error:', error);
+        cleanupTimeout();
         resolve({
           success: false,
           error: `Failed to execute DepotDownloader: ${error.message}`
         });
       });
-
-      // Set a timeout for the login test
-      setTimeout(() => {
-        depotDownloader.kill();
-        resolve({
-          success: false,
-          error: 'Steam login test timed out'
-        });
-      }, 30000); // 30 second timeout
     });
 
   } catch (error) {

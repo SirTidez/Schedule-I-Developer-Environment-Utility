@@ -16,7 +16,7 @@
  * @version 2.0.3
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface SteamLoginStepProps {
   onLoginSuccess: (credentials: { username: string; password: string; stayLoggedIn: boolean }) => void;
@@ -62,6 +62,7 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
   const [configDir, setConfigDir] = useState<string>('');
   const [steamGuardType, setSteamGuardType] = useState<'email'|'mobile'|null>(null);
   const [steamGuardCode, setSteamGuardCode] = useState('');
+  const mobileApprovalAbortRef = useRef(false);
 
   // DepotDownloader progress listener for Steam Guard messages
   useEffect(() => {
@@ -150,7 +151,7 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
 
       // Attempt DepotDownloader login
       const result = await window.electronAPI?.depotdownloader?.login(depotDownloaderPath || undefined, username, password);
-      
+
       if (result.success) {
         setLoginStatus({
           isLoggingIn: false,
@@ -164,16 +165,21 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
         // Notify parent component
         onLoginSuccess({ username, password, stayLoggedIn: false });
       } else if ((result as any).requiresSteamGuard || (result as any).steamGuardRequired) {
-        setLoginStatus(prev => ({
-          ...prev,
-          isLoggingIn: false,
-          steamGuardRequired: true,
-          progress: (result as any).guardType === 'email' ? 'Steam Guard email code required' : 'Steam Guard mobile approval required'
-        }));
-        try {
-          const gt = (result as any).guardType;
-          if (gt === 'email' || gt === 'mobile') setSteamGuardType(gt);
-        } catch {}
+        const guardType = (result as any).guardType === 'mobile' ? 'mobile' : 'email';
+        if (guardType === 'mobile') {
+          setSteamGuardType('mobile');
+          setSteamGuardCode('');
+          await waitForMobileApproval();
+        } else {
+          setSteamGuardType('email');
+          setSteamGuardCode('');
+          setLoginStatus(prev => ({
+            ...prev,
+            isLoggingIn: false,
+            steamGuardRequired: true,
+            progress: 'Steam Guard email code required'
+          }));
+        }
       } else {
         setLoginStatus(prev => ({
           ...prev,
@@ -191,43 +197,81 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
     }
   };
 
-  const handleSteamGuardConfirm = async () => {
+  const waitForMobileApproval = async () => {
+    mobileApprovalAbortRef.current = false;
     setLoginStatus(prev => ({
       ...prev,
       isLoggingIn: true,
+      steamGuardRequired: true,
+      error: null,
       progress: 'Waiting for Steam Guard mobile approval...'
     }));
 
-    // Periodic status updates while waiting
-    let seconds = 0;
-    const interval = setInterval(() => {
-      seconds += 5;
-      setLoginStatus(prev => ({ ...prev, progress: `Waiting for mobile approval... (${seconds}s)` }));
-    }, 5000);
-
-    // Timeout after 120 seconds
-    const timeout = setTimeout(async () => {
-      clearInterval(interval);
-      try { await window.electronAPI?.depotdownloader?.cancel?.(); } catch {}
-      setLoginStatus(prev => ({ ...prev, isLoggingIn: false, error: 'Timed out waiting for mobile approval. Please approve in Steam Mobile and try again.' }));
-    }, 120000);
-
     try {
-      const result = await window.electronAPI?.depotdownloader?.login(depotDownloaderPath || undefined, username, password, { confirmSteamGuard: true });
-      clearInterval(interval);
-      clearTimeout(timeout);
-      if (result.success) {
+      const result = await window.electronAPI?.depotdownloader?.login(
+        depotDownloaderPath || undefined,
+        username,
+        password,
+        { confirmSteamGuard: true }
+      );
+
+      if (mobileApprovalAbortRef.current) {
+        return;
+      }
+
+      if (result?.success) {
         setLoginStatus({ isLoggingIn: false, isSuccess: true, error: null, steamGuardRequired: false, progress: 'Login successful!' });
+        setSteamGuardType(null);
+        setSteamGuardCode('');
         try { await window.electronAPI?.credCache?.set?.({ username, password }); } catch {}
         onLoginSuccess({ username, password, stayLoggedIn: false });
+      } else if ((result as any)?.requiresSteamGuard && (result as any).guardType === 'mobile') {
+        setLoginStatus(prev => ({
+          ...prev,
+          isLoggingIn: false,
+          steamGuardRequired: false,
+          error: (result as any).message || 'Steam Guard mobile approval timed out. Approve in Steam Mobile and try again.',
+          progress: ''
+        }));
+        setSteamGuardType(null);
       } else {
-        setLoginStatus(prev => ({ ...prev, isLoggingIn: false, error: result.error || 'Steam Guard confirmation failed' }));
+        setLoginStatus(prev => ({
+          ...prev,
+          isLoggingIn: false,
+          steamGuardRequired: false,
+          error: result?.error || 'Steam Guard confirmation failed',
+          progress: ''
+        }));
+        setSteamGuardType(null);
       }
     } catch (error) {
-      clearInterval(interval);
-      clearTimeout(timeout);
-      setLoginStatus(prev => ({ ...prev, isLoggingIn: false, error: error instanceof Error ? error.message : 'Steam Guard confirmation failed' }));
+      if (mobileApprovalAbortRef.current) {
+        return;
+      }
+      setLoginStatus(prev => ({
+        ...prev,
+        isLoggingIn: false,
+        steamGuardRequired: false,
+        error: error instanceof Error ? error.message : 'Steam Guard confirmation failed',
+        progress: ''
+      }));
+      setSteamGuardType(null);
+    } finally {
+      mobileApprovalAbortRef.current = false;
     }
+  };
+
+  const cancelMobileWait = async () => {
+    mobileApprovalAbortRef.current = true;
+    try { await window.electronAPI?.depotdownloader?.cancel?.(); } catch {}
+    setLoginStatus(prev => ({
+      ...prev,
+      isLoggingIn: false,
+      steamGuardRequired: false,
+      error: 'Cancelled waiting for mobile approval',
+      progress: ''
+    }));
+    setSteamGuardType(null);
   };
 
   const handleSteamGuardSubmitCode = async () => {
@@ -394,17 +438,18 @@ const SteamLoginStep: React.FC<SteamLoginStepProps> = ({
               <h4 className="font-semibold text-yellow-300 mb-2">Steam Guard Authentication Required</h4>
               {steamGuardType === 'mobile' ? (
                 <>
-                  <p className="text-yellow-200 text-sm mb-4">Your account requires mobile approval. Approve the login in your Steam Mobile app, then click below.</p>
-                  <button onClick={handleSteamGuardConfirm} disabled={loginStatus.isLoggingIn} className="btn-primary">
-                    {loginStatus.isLoggingIn ? 'Confirming...' : 'I Have Approved in Steam Mobile App'}
-                  </button>
-                  <button
-                    onClick={async () => { try { await window.electronAPI?.depotdownloader?.cancel?.(); } catch {}; setLoginStatus(prev => ({ ...prev, isLoggingIn: false, error: 'Cancelled waiting for mobile approval' })); }}
-                    disabled={loginStatus.isLoggingIn}
-                    className="btn-secondary ml-2"
-                  >
-                    Cancel
-                  </button>
+                  <p className="text-yellow-200 text-sm mb-4">Approve the login in your Steam Mobile app. The wizard will continue automatically once Steam confirms.</p>
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-2">
+                      <div className={`h-3 w-3 border-2 border-yellow-400 border-t-transparent rounded-full ${loginStatus.isLoggingIn ? 'animate-spin' : ''}`} />
+                      <span className="text-xs text-yellow-200">
+                        {loginStatus.isLoggingIn ? 'Waiting for Steam Mobile approval…' : 'Awaiting Steam Mobile approval.'}
+                      </span>
+                    </div>
+                    <button onClick={cancelMobileWait} className="btn-secondary">
+                      Cancel
+                    </button>
+                  </div>
                 </>
               ) : (
                 <>
