@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfigService } from '../../hooks/useConfigService';
 import { useFileService } from '../../hooks/useFileService';
@@ -21,6 +21,7 @@ interface BranchInfo {
   needsUpdate: boolean;
   steamBranchKey: string; // The actual Steam branch key (public, beta, alternative, alternative_beta)
   remoteBuildId?: number;
+  isUpdateInfoPending?: boolean;
   // Multi-version support
   availableVersions: Array<{buildId: string, date: string, sizeBytes?: number}>;
   activeVersion: string;
@@ -68,7 +69,9 @@ const ManagedEnvironment: React.FC = () => {
   const [ddPercent, setDdPercent] = useState<number>(0);
   const [ddActive, setDdActive] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  
+  const [branchUpdateCheckInProgress, setBranchUpdateCheckInProgress] = useState(false);
+  const loadRequestRef = useRef(0);
+
   const handleCancelDepotDownload = async (branch: BranchInfo) => {
     try {
       const res = await window.electronAPI.depotdownloader.cancel();
@@ -140,20 +143,114 @@ const ManagedEnvironment: React.FC = () => {
   const loadBranches = async () => {
     if (!config) return;
 
+    const requestId = loadRequestRef.current + 1;
+    loadRequestRef.current = requestId;
+
     setLoading(true);
     setError(null);
 
+    const allBranches = [
+      { name: 'Main', steamBranchKey: 'public', folderName: 'main-branch' },
+      { name: 'Beta', steamBranchKey: 'beta', folderName: 'beta-branch' },
+      { name: 'Alternate', steamBranchKey: 'alternate', folderName: 'alternate-branch' },
+      { name: 'Alternate Beta', steamBranchKey: 'alternate-beta', folderName: 'alternate-beta-branch' }
+    ];
+
+    let baseBranchInfos: BranchInfo[] = [];
+
     try {
-      // Define all possible branches
-      const allBranches = [
-        { name: 'Main', steamBranchKey: 'public', folderName: 'main-branch' },
-        { name: 'Beta', steamBranchKey: 'beta', folderName: 'beta-branch' },
-        { name: 'Alternate', steamBranchKey: 'alternate', folderName: 'alternate-branch' },
-        { name: 'Alternate Beta', steamBranchKey: 'alternate-beta', folderName: 'alternate-beta-branch' }
-      ];
+      baseBranchInfos = await Promise.all(
+        allBranches.map(async (branch) => {
+          const branchPath = await window.electronAPI.pathUtils.getBranchBasePath(config.managedEnvironmentPath, branch.folderName);
+          const dirExists = await checkFileExists(branchPath);
 
-      const branchInfos: BranchInfo[] = [];
+          const activeManifestId = config.activeManifestPerBranch?.[branch.folderName];
+          const activeBuildId = config.activeBuildPerBranch?.[branch.folderName];
+          const buildId = activeManifestId || activeBuildId || '';
+          const branchBuildMeta = config.branchBuildIds?.[branch.folderName];
+          const lastUpdated = branchBuildMeta
+            ? new Date(branchBuildMeta.updatedTime).getTime() / 1000
+            : Date.now() / 1000;
 
+          let exeExists = false;
+          let needsRepair = false;
+
+          if (activeManifestId) {
+            const activeVersionPath = await window.electronAPI.pathUtils.getBranchVersionPath(
+              config.managedEnvironmentPath,
+              branch.folderName,
+              activeManifestId,
+              'manifest'
+            );
+            const activeExePath = `${activeVersionPath}\\Schedule I.exe`;
+            exeExists = await checkFileExists(activeExePath);
+            needsRepair = dirExists && !exeExists;
+          } else if (activeBuildId) {
+            const activeVersionPath = await window.electronAPI.pathUtils.getBranchVersionPath(
+              config.managedEnvironmentPath,
+              branch.folderName,
+              activeBuildId,
+              'build'
+            );
+            const activeExePath = `${activeVersionPath}\\Schedule I.exe`;
+            exeExists = await checkFileExists(activeExePath);
+            needsRepair = dirExists && !exeExists;
+          } else {
+            const legacyExePath = `${branchPath}\\Schedule I.exe`;
+            exeExists = await checkFileExists(legacyExePath);
+            needsRepair = dirExists && !exeExists;
+          }
+
+          const isInstalled = !!exeExists;
+
+          let activeVersion = '';
+          if (activeManifestId) {
+            activeVersion = `manifest_${activeManifestId}`;
+          } else if (activeBuildId) {
+            activeVersion = `build_${activeBuildId}`;
+          }
+
+          return {
+            name: branch.name,
+            folderName: branch.folderName,
+            path: branchPath,
+            buildId,
+            lastUpdated,
+            isInstalled,
+            needsRepair,
+            size: isInstalled ? '2.5 GB' : (needsRepair ? 'Unknown' : 'Not installed'),
+            needsUpdate: false,
+            steamBranchKey: branch.steamBranchKey,
+            remoteBuildId: undefined,
+            availableVersions: [],
+            activeVersion,
+            installedVersions: 0,
+            steamManifestId: '',
+            updateManifestId: undefined,
+            isUpdateInfoPending: true
+          } as BranchInfo;
+        })
+      );
+
+      if (loadRequestRef.current !== requestId) {
+        return;
+      }
+
+      setBranches(baseBranchInfos);
+      setLoading(false);
+    } catch (err) {
+      if (loadRequestRef.current !== requestId) {
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Failed to load branches');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setBranchUpdateCheckInProgress(true);
+
+      const baseInfoByFolder = new Map(baseBranchInfos.map((branch) => [branch.folderName, branch]));
       const userAddedVersionsCache: Record<string, UserAddedVersionInfo[]> = {};
       const branchesNeedingUserAddedUpdate = new Set<string>();
 
@@ -170,7 +267,6 @@ const ManagedEnvironment: React.FC = () => {
         return userAddedVersionsCache[branchKey];
       };
 
-      // Prefetch latest DepotDownloader manifest information when available
       let latestDepotManifests: Record<string, { manifestId: string; buildId: string }> = {};
       if (config.useDepotDownloader) {
         try {
@@ -207,57 +303,37 @@ const ManagedEnvironment: React.FC = () => {
         }
       }
 
-      // Fetch latest branch build IDs via Steam (node-steam-user)
-      // Note: This now uses cached data to reduce resource usage - Steam API calls
-      // are cached for 5 minutes to avoid repeated expensive API requests
       let latestBranchBuilds: Record<string, string> = {};
-      let currentSteamBranchKey = '';
       try {
         const latest = await window.electronAPI.steamUpdate.getAllBranchBuildIds();
         if (latest?.success && latest.map) {
           latestBranchBuilds = latest.map;
         }
-        currentSteamBranchKey = await detectCurrentSteamBranchKey(config.steamLibraryPath) || '';
+        try {
+          await detectCurrentSteamBranchKey(config.steamLibraryPath);
+        } catch (err) {
+          console.warn('Could not determine current Steam branch:', err);
+        }
       } catch (err) {
         console.warn('Could not fetch latest branch build IDs or current branch:', err);
       }
 
+      const branchInfos: BranchInfo[] = [];
+
       for (const branch of allBranches) {
-        const branchPath = await window.electronAPI.pathUtils.getBranchBasePath(config.managedEnvironmentPath, branch.folderName);
-        const dirExists = await checkFileExists(branchPath);
-        
-        // Get active version from config (prioritize manifest over build)
+        const baseInfo = baseInfoByFolder.get(branch.folderName);
+        const branchPath = baseInfo?.path ?? await window.electronAPI.pathUtils.getBranchBasePath(config.managedEnvironmentPath, branch.folderName);
         const activeManifestId = config.activeManifestPerBranch?.[branch.folderName];
         const activeBuildId = config.activeBuildPerBranch?.[branch.folderName];
         const buildId = activeManifestId || activeBuildId || '';
-        const lastUpdated = config.branchBuildIds[branch.folderName] ? new Date(config.branchBuildIds[branch.folderName].updatedTime).getTime() / 1000 : Date.now() / 1000;
-        
-        // Check for active version and executable in version-specific structure
-        let exeExists = false;
-        let needsRepair = false;
-        
-        if (activeManifestId) {
-          // Check if executable exists in the active manifest version's subdirectory
-          const activeVersionPath = await window.electronAPI.pathUtils.getBranchVersionPath(config.managedEnvironmentPath, branch.folderName, activeManifestId, 'manifest');
-          const activeExePath = `${activeVersionPath}\\Schedule I.exe`;
-          exeExists = await checkFileExists(activeExePath);
-          needsRepair = dirExists && !exeExists; // Folder exists but active version's exe missing
-        } else if (activeBuildId) {
-          // Check if executable exists in the active build version's subdirectory
-          const activeVersionPath = await window.electronAPI.pathUtils.getBranchVersionPath(config.managedEnvironmentPath, branch.folderName, activeBuildId, 'build');
-          const activeExePath = `${activeVersionPath}\\Schedule I.exe`;
-          exeExists = await checkFileExists(activeExePath);
-          needsRepair = dirExists && !exeExists; // Folder exists but active version's exe missing
-        } else {
-          // Legacy check: look for exe directly in branch folder
-          const legacyExePath = `${branchPath}\\Schedule I.exe`;
-          exeExists = await checkFileExists(legacyExePath);
-          needsRepair = dirExists && !exeExists; // Folder exists but exe missing
-        }
-        
-        const isInstalled = !!exeExists; // Only installed if executable exists
+        const branchBuildMeta = config.branchBuildIds?.[branch.folderName];
+        const lastUpdated = baseInfo?.lastUpdated ?? (branchBuildMeta
+          ? new Date(branchBuildMeta.updatedTime).getTime() / 1000
+          : Date.now() / 1000);
+        const isInstalled = baseInfo?.isInstalled ?? false;
+        const needsRepair = baseInfo?.needsRepair ?? false;
+        const size = baseInfo?.size ?? (isInstalled ? '2.5 GB' : (needsRepair ? 'Unknown' : 'Not installed'));
 
-        // Determine update status vs Steam (node-steam-user) for this branch key
         let needsUpdate = false;
         let remoteBuildIdNum: number | undefined = undefined;
         const remoteBuildStr = latestBranchBuilds[branch.steamBranchKey] || '';
@@ -269,16 +345,14 @@ const ManagedEnvironment: React.FC = () => {
         }
         let updateManifestId: string | undefined;
 
-        // Load version information for multi-version support
-        let availableVersions: Array<{buildId: string, date: string, sizeBytes?: number}> = [];
-        let activeVersion = '';
-        let installedVersions = 0;
+        let availableVersions: Array<{buildId: string, date: string, sizeBytes?: number}> = baseInfo?.availableVersions ?? [];
+        let activeVersion = baseInfo?.activeVersion ?? '';
+        let installedVersions = baseInfo?.installedVersions ?? 0;
         let steamManifestId = latestDepotManifests[branch.folderName]?.manifestId || '';
         const depotManifestBuildId = latestDepotManifests[branch.folderName]?.buildId;
 
         let installed: any[] = [];
         try {
-          // Get available versions from Steam
           const available = await window.electronAPI.steam.listBranchBuilds(branch.steamBranchKey, 10);
           availableVersions = available.map((v: any) => ({
             buildId: v.buildId,
@@ -286,14 +360,9 @@ const ManagedEnvironment: React.FC = () => {
             sizeBytes: v.sizeBytes
           }));
 
-          // Get installed versions (both build and manifest based)
           installed = await window.electronAPI.steam.getInstalledVersions(branch.folderName);
           installedVersions = installed.length;
 
-          // Find active version from config (prioritize manifest over build)
-          const activeManifestId = config.activeManifestPerBranch?.[branch.folderName];
-          const activeBuildId = config.activeBuildPerBranch?.[branch.folderName];
-          
           if (activeManifestId) {
             activeVersion = `manifest_${activeManifestId}`;
           } else if (activeBuildId) {
@@ -302,21 +371,17 @@ const ManagedEnvironment: React.FC = () => {
             activeVersion = '';
           }
 
-          // Get latest manifest ID from Steam API for this branch
           if (!steamManifestId) {
             try {
               const depotManifests = await window.electronAPI.steamBranch.getDepotManifestsForBranch(branch.steamBranchKey);
               if (depotManifests?.success && depotManifests.depots && depotManifests.depots.length > 0) {
-                // Find the primary depot manifest (assuming depot 3164501 is the main one)
                 const primaryDepot = depotManifests.depots.find((d: any) => d.depotId === '3164501');
                 if (primaryDepot) {
                   steamManifestId = primaryDepot.manifestId;
                 } else if (depotManifests.depots.length > 0) {
-                  // Fallback to first depot if primary not found
                   steamManifestId = depotManifests.depots[0].manifestId;
                 }
               } else {
-                // If no depot manifests available, try to get build ID as fallback
                 console.warn(`No depot manifests found for ${branch.name} (${branch.steamBranchKey}), trying build ID fallback`);
                 try {
                   const buildIdResult = await window.electronAPI.steamBranch.getBranchBuildId(branch.steamBranchKey);
@@ -329,7 +394,6 @@ const ManagedEnvironment: React.FC = () => {
               }
             } catch (manifestErr) {
               console.warn(`Failed to get manifest ID for ${branch.name}:`, manifestErr);
-              // Try build ID as fallback
               try {
                 const buildIdResult = await window.electronAPI.steamBranch.getBranchBuildId(branch.steamBranchKey);
                 if (buildIdResult?.success && buildIdResult.buildId) {
@@ -344,7 +408,6 @@ const ManagedEnvironment: React.FC = () => {
           console.warn(`Failed to load version info for ${branch.name}:`, err);
         }
 
-        // Determine update requirement
         const remoteManifestId = (steamManifestId && /^\d+$/.test(steamManifestId)) ? steamManifestId : '';
         if (activeManifestId) {
           if (remoteManifestId) {
@@ -353,14 +416,12 @@ const ManagedEnvironment: React.FC = () => {
               updateManifestId = remoteManifestId;
             }
           } else if (depotManifestBuildId && remoteBuildIdNum && !Number.isNaN(Number(depotManifestBuildId))) {
-            // Fallback to comparing build IDs if manifest is unavailable
             needsUpdate = remoteBuildIdNum > Number(depotManifestBuildId);
           } else {
             needsUpdate = false;
           }
         } else if (remoteBuildIdNum !== undefined) {
           if (buildId && typeof buildId === 'string' && buildId.includes('/')) {
-            // DepotDownloader timestamp format - cannot compare numerically
             needsUpdate = false;
           } else if (buildId && typeof buildId === 'number' && buildId > 0) {
             needsUpdate = remoteBuildIdNum > buildId;
@@ -370,7 +431,6 @@ const ManagedEnvironment: React.FC = () => {
         }
 
         if (needsUpdate && updateManifestId && config.useDepotDownloader) {
-          // Ensure the latest manifest is enqueued in Version Manager
           try {
             const installedManifests = new Set(
               installed
@@ -403,19 +463,20 @@ const ManagedEnvironment: React.FC = () => {
           name: branch.name,
           folderName: branch.folderName,
           path: branchPath,
-          buildId: buildId,
-          lastUpdated: lastUpdated,
-          isInstalled: isInstalled,
-          needsRepair: needsRepair,
-          size: isInstalled ? '2.5 GB' : (needsRepair ? 'Unknown' : 'Not installed'),
-          needsUpdate: needsUpdate,
+          buildId,
+          lastUpdated,
+          isInstalled,
+          needsRepair,
+          size,
+          needsUpdate,
           steamBranchKey: branch.steamBranchKey,
           remoteBuildId: remoteBuildIdNum,
           availableVersions,
           activeVersion,
           installedVersions,
           steamManifestId,
-          updateManifestId
+          updateManifestId,
+          isUpdateInfoPending: false
         });
       }
 
@@ -429,11 +490,22 @@ const ManagedEnvironment: React.FC = () => {
         }
       }
 
+      if (loadRequestRef.current !== requestId) {
+        return;
+      }
+
       setBranches(branchInfos);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load branches');
+      console.warn('Failed to complete branch update check:', err);
+      if (loadRequestRef.current !== requestId) {
+        return;
+      }
+      setBranches(prev => prev.map(branch => ({ ...branch, isUpdateInfoPending: false })));
     } finally {
-      setLoading(false);
+      if (loadRequestRef.current === requestId) {
+        setBranchUpdateCheckInProgress(false);
+        setLoading(false);
+      }
     }
   };
 
@@ -991,6 +1063,13 @@ const ManagedEnvironment: React.FC = () => {
             </div>
           )}
 
+          {!loading && branchUpdateCheckInProgress && (
+            <div className="flex items-center space-x-2 text-sm text-blue-300 mb-4">
+              <div className="h-3 w-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+              <span>Checking for branch updates...</span>
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4 mb-6">
               <p className="text-red-400">{error}</p>
@@ -1011,65 +1090,101 @@ const ManagedEnvironment: React.FC = () => {
 
           {!loading && !error && branches.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {branches.map((branch) => (
-                <div key={branch.name} className="card">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold capitalize">{branch.name}</h3>
-                    <div className="flex items-center space-x-2">
-                      {branch.needsUpdate && (
-                        <div className="w-3 h-3 rounded-full bg-yellow-500" title="Update available"></div>
-                      )}
-                      <div className={`w-3 h-3 rounded-full ${
-                        branch.needsRepair ? 'bg-orange-500' : (branch.isInstalled ? 'bg-green-500' : 'bg-red-500')
-                      }`} title={branch.needsRepair ? 'Needs Repair' : (branch.isInstalled ? 'Installed' : 'Not installed')}></div>
-                      {/* Version Manager Button */}
-                      <button
-                        onClick={() => handleOpenVersionManager(branch)}
-                        className={`p-1 rounded transition-colors ${branch.needsUpdate ? 'bg-blue-900/30 text-blue-300 hover:text-blue-100' : 'text-gray-400 hover:text-white'}`}
-                        title={branch.needsUpdate ? 'Install latest update' : 'Manage versions'}
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v8" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4 4 4-4" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19h14" />
-                        </svg>
-                      </button>
+              {branches.map((branch) => {
+                const statusText = branch.isUpdateInfoPending
+                  ? 'Checking for updates...'
+                  : branch.needsRepair
+                    ? 'Needs Repair'
+                    : branch.needsUpdate
+                      ? 'Update Available'
+                      : branch.isInstalled
+                        ? 'Installed'
+                        : 'Not Installed';
+
+                const statusClass = branch.isUpdateInfoPending
+                  ? 'text-blue-300'
+                  : branch.needsRepair
+                    ? 'text-orange-400'
+                    : branch.needsUpdate
+                      ? 'text-yellow-400'
+                      : branch.isInstalled
+                        ? 'text-green-400'
+                        : 'text-red-400';
+
+                const steamVersionDisplay = branch.isUpdateInfoPending
+                  ? 'Checking...'
+                  : (branch.steamManifestId || 'Not Available');
+
+                const installedVersionsDisplay = branch.isUpdateInfoPending
+                  ? 'Checking...'
+                  : branch.installedVersions;
+
+                const availableVersionsDisplay = branch.isUpdateInfoPending
+                  ? 'Checking...'
+                  : branch.availableVersions.length;
+
+                return (
+                  <div key={branch.name} className="card">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-semibold capitalize">{branch.name}</h3>
+                      <div className="flex items-center space-x-2">
+                        {branch.isUpdateInfoPending ? (
+                          <div className="h-3 w-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" title="Checking for updates"></div>
+                        ) : (
+                          branch.needsUpdate && (
+                            <div className="w-3 h-3 rounded-full bg-yellow-500" title="Update available"></div>
+                          )
+                        )}
+                        <div className={`w-3 h-3 rounded-full ${
+                          branch.needsRepair ? 'bg-orange-500' : (branch.isInstalled ? 'bg-green-500' : 'bg-red-500')
+                        }`} title={branch.needsRepair ? 'Needs Repair' : (branch.isInstalled ? 'Installed' : 'Not installed')}></div>
+                        <button
+                          onClick={() => handleOpenVersionManager(branch)}
+                          className={`p-1 rounded transition-colors ${
+                            branch.isUpdateInfoPending
+                              ? 'text-blue-300'
+                              : branch.needsUpdate
+                                ? 'bg-blue-900/30 text-blue-300 hover:text-blue-100'
+                                : 'text-gray-400 hover:text-white'
+                          }`}
+                          title={branch.isUpdateInfoPending ? 'Checking for updates' : (branch.needsUpdate ? 'Install latest update' : 'Manage versions')}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v8" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4 4 4-4" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19h14" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-2 mb-4">
-                    <p className="text-sm text-gray-400">
-                      Steam Version: <span className="text-gray-300">{branch.steamManifestId || 'Not Available'}</span>
-                    </p>
-                    {branch.buildId && (
+
+                    <div className="space-y-2 mb-4">
                       <p className="text-sm text-gray-400">
-                        Build ID: <span className="text-gray-300">{branch.buildId}</span>
+                        Steam Version: <span className="text-gray-300">{steamVersionDisplay}</span>
                       </p>
-                    )}
-                    <p className="text-sm text-gray-400">
-                      Installed Versions: <span className="text-gray-300">{branch.installedVersions}</span>
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Available Versions: <span className="text-gray-300">{branch.availableVersions.length}</span>
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Last Updated: <span className="text-gray-300">
-                        {new Date(branch.lastUpdated * 1000).toLocaleString()}
-                      </span>
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Size: <span className="text-gray-300">{branch.size}</span>
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Status: <span className={`${
-                        branch.needsRepair ? 'text-orange-400' : (branch.needsUpdate ? 'text-yellow-400' : 
-                        branch.isInstalled ? 'text-green-400' : 'text-red-400')
-                      }`}>
-                        {branch.needsRepair ? 'Needs Repair' : (branch.needsUpdate ? 'Update Available' : 
-                         branch.isInstalled ? 'Installed' : 'Not Installed')}
-                      </span>
-                    </p>
-                  </div>
+                      {branch.buildId && (
+                        <p className="text-sm text-gray-400">
+                          Build ID: <span className="text-gray-300">{branch.buildId}</span>
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-400">
+                        Installed Versions: <span className="text-gray-300">{installedVersionsDisplay}</span>
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        Available Versions: <span className="text-gray-300">{availableVersionsDisplay}</span>
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        Last Updated: <span className="text-gray-300">
+                          {new Date(branch.lastUpdated * 1000).toLocaleString()}
+                        </span>
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        Size: <span className="text-gray-300">{branch.size}</span>
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        Status: <span className={statusClass}>{statusText}</span>
+                      </p>
+                    </div>
 
                   <div className="space-y-2">
                     {!branch.isInstalled ? (
@@ -1179,7 +1294,8 @@ const ManagedEnvironment: React.FC = () => {
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
