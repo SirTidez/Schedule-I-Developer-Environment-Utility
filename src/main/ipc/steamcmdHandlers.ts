@@ -433,7 +433,7 @@ async function handleDownloadBranch(event: any, steamCMDPath: string, username: 
               event.sender.send('steamcmd-progress', { type: 'percent', value: latestPercent });
             }
           } catch {}
-        }, 50); // flush every 50ms max
+        }, 50) as unknown as NodeJS.Timeout; // flush every 50ms max
       };
 
       const handleChunk = (chunk: string, isError = false) => {

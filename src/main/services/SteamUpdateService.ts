@@ -288,7 +288,7 @@ export class SteamUpdateService extends EventEmitter {
 
     this.reconnectTimer = setTimeout(() => {
       this.connect();
-    }, delay);
+    }, delay) as unknown as NodeJS.Timeout;
   }
 
   /**

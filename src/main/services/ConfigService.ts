@@ -62,7 +62,6 @@ export class ConfigService {
     // Initialize with config from file if it exists, otherwise use defaults
     this.store = new Store({
       name: 'config',
-      projectName: 'schedule-i-dev-environment',
       defaults: this.getDefaultConfig(),
       cwd: configDir  // Set the working directory to our custom location
     });

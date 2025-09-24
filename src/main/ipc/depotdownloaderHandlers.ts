@@ -689,7 +689,7 @@ async function handleDownloadBranch(event: any, depotDownloaderPath: string | un
               event.sender.send('depotdownloader-progress', { type: 'percent', value: latestPercent });
             }
           } catch {}
-        }, 50); // flush every 50ms max
+        }, 50) as unknown as NodeJS.Timeout; // flush every 50ms max
       };
 
       const handleChunk = (chunk: string, isError = false) => {
@@ -1177,7 +1177,7 @@ async function handleDownloadWithManifest(event: any, depotDownloaderPath: strin
               event.sender.send('depotdownloader-progress', { type: 'percent', value: latestPercent });
             }
           } catch {}
-        }, 50);
+        }, 50) as unknown as NodeJS.Timeout;
       };
 
       const handleChunk = (chunk: string, isError = false) => {
